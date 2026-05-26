@@ -1,3 +1,6 @@
+from src.validators import get_non_empty_input, get_non_negative_int
+
+
 def get_next_id(items):
     if not items:
         return 1
@@ -7,11 +10,11 @@ def get_next_id(items):
 def add_item(items):
     print("\nAdd New Item")
 
-    name = input("Name: ").strip()
-    category = input("Category: ").strip()
-    location = input("Location: ").strip()
-    quantity = int(input("Quantity: ").strip())
-    minimum_quantity = int(input("Minimum quantity: ").strip())
+    name = get_non_empty_input("Name: ")
+    category = get_non_empty_input("Category: ")
+    location = get_non_empty_input("Location: ")
+    quantity = get_non_negative_int("Quantity: ")
+    minimum_quantity = get_non_negative_int("Minimum quantity: ")
     notes = input("Notes: ").strip()
 
     item = {
