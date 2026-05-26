@@ -1,4 +1,5 @@
 from src.validators import get_non_empty_input, get_non_negative_int
+from src.display import print_items
 
 
 def get_next_id(items):
@@ -38,16 +39,7 @@ def list_items(items):
         print("No items in inventory.")
         return
 
-    for item in items:
-        print(
-            f"ID: {item['id']} | "
-            f"Name: {item['name']} | "
-            f"Category: {item['category']} | "
-            f"Location: {item['location']} | "
-            f"Quantity: {item['quantity']} | "
-            f"Minimum: {item['minimum_quantity']} | "
-            f"Notes: {item['notes']}"
-        )
+    print_items(items)
 
 def search_items(items, search_term):
     pass
