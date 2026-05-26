@@ -1,6 +1,7 @@
 from src.menu import show_menu, get_user_choice
 from src.inventory_service import add_item, list_items
 
+
 def main():
 
     items = []
@@ -11,10 +12,8 @@ def main():
 
         if choice == "1":
             add_item(items)
-            # print("Add item selected.")
         elif choice == "2":
             list_items(items)
-            # print("View all items selected.")
         elif choice == "3":
             print("Search items selected.")
         elif choice == "4":
@@ -28,6 +27,7 @@ def main():
             break
         else:
             print("Invalid choice. Please enter a number from 1 to 7.")
+
 
 if __name__ == "__main__":
     main()
