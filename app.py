@@ -1,14 +1,20 @@
 from src.menu import show_menu, get_user_choice
+from src.inventory_service import add_item, list_items
 
 def main():
+
+    items = []
+
     while True:
         show_menu()
         choice = get_user_choice()
 
         if choice == "1":
-            print("Add item selected.")
+            add_item(items)
+            # print("Add item selected.")
         elif choice == "2":
-            print("View all items selected.")
+            list_items(items)
+            # print("View all items selected.")
         elif choice == "3":
             print("Search items selected.")
         elif choice == "4":
