@@ -1,5 +1,6 @@
 from src.menu import show_menu, get_user_choice
-from src.inventory_service import add_item, list_items
+from src.inventory_service import add_item, list_items, search_items
+from src.display import print_items
 
 
 def main():
@@ -15,7 +16,18 @@ def main():
         elif choice == "2":
             list_items(items)
         elif choice == "3":
-            print("Search items selected.")
+            search_term = input("Enter item name to search: ").strip()
+
+            if not search_term:
+                print("Search term cannot be empty.")
+            else:
+                matching_items = search_items(items, search_term)
+
+                if not matching_items:
+                    print(f"No items found matching '{search_term}'.")
+                else:
+                    print(f"\nSearch results for '{search_term}':")
+                    print_items(matching_items)
         elif choice == "4":
             print("Update item selected.")
         elif choice == "5":

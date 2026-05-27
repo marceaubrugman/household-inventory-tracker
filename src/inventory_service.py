@@ -42,7 +42,13 @@ def list_items(items):
     print_items(items)
 
 def search_items(items, search_term):
-    pass
+    normalized_search_term = search_term.strip().lower()
+
+    return [
+        item
+        for item in items
+        if normalized_search_term in item["name"].lower()
+    ]
 
 def update_item(items, item_id, updated_data):
     pass
