@@ -1,5 +1,5 @@
 from src.menu import show_menu, get_user_choice
-from src.inventory_service import add_item, list_items, search_items
+from src.inventory_service import add_item, list_items, search_items, update_item
 from src.display import print_items
 
 
@@ -29,7 +29,7 @@ def main():
                     print(f"\nSearch results for '{search_term}':")
                     print_items(matching_items)
         elif choice == "4":
-            print("Update item selected.")
+            update_item(items)
         elif choice == "5":
             print("Delete item selected.")
         elif choice == "6":
