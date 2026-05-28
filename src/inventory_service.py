@@ -47,6 +47,7 @@ def list_items(items):
 
     print_items(items)
 
+
 def search_items(items, search_term):
     normalized_search_term = search_term.strip().lower()
 
@@ -55,6 +56,7 @@ def search_items(items, search_term):
         for item in items
         if normalized_search_term in item["name"].lower()
     ]
+
 
 def find_item_by_id(items, item_id):
     for item in items:
@@ -95,8 +97,32 @@ def update_item(items):
 
     print(f"Item ID {item_id} updated successfully.")
 
-def delete_item(items, item_id):
-    pass
+
+def delete_item(items):
+    print("\nDelete Item")
+
+    if not items:
+        print("No items in inventory.")
+        return
+
+    item_id = get_positive_int("Enter item ID to delete: ")
+    item = find_item_by_id(items, item_id)
+
+    if item is None:
+        print(f"No item found with ID {item_id}.")
+        return
+
+    print("\nItem to delete:")
+    print_item(item)
+
+    confirmation = input("Are you sure you want to delete this item? (y/n): ").strip().lower()
+
+    if confirmation == "y":
+        items.remove(item)
+        print(f"Item ID {item_id} deleted successfully.")
+    else:
+        print("Deletion cancelled.")
+
 
 def get_low_stock_items(items):
     pass

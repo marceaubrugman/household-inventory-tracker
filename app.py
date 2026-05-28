@@ -1,5 +1,5 @@
 from src.menu import show_menu, get_user_choice
-from src.inventory_service import add_item, list_items, search_items, update_item
+from src.inventory_service import add_item, list_items, search_items, update_item, delete_item
 from src.display import print_items
 
 
@@ -31,7 +31,7 @@ def main():
         elif choice == "4":
             update_item(items)
         elif choice == "5":
-            print("Delete item selected.")
+            delete_item(items)
         elif choice == "6":
             print("View low-stock items selected.")
         elif choice == "7":

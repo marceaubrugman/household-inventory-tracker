@@ -19,6 +19,7 @@ def get_non_negative_int(prompt):
         except ValueError:
             print("Please enter a valid whole number.")
 
+
 def get_positive_int(prompt):
     while True:
         raw_value = input(prompt).strip()
