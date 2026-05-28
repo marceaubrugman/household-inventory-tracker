@@ -8,11 +8,12 @@ from src.inventory_service import (
     get_low_stock_items,
 )
 from src.display import print_items
+from src.storage import load_inventory, save_inventory
 
 
 def main():
 
-    items = []
+    items = load_inventory()
 
     while True:
         show_menu()
@@ -48,7 +49,8 @@ def main():
                 print("\nLow-stock items:")
                 print_items(low_stock_items)
         elif choice == "7":
-            print("Goodbye.")
+            save_inventory(items)
+            print("Inventory saved. Goodbye.")
             break
         else:
             print("Invalid choice. Please enter a number from 1 to 7.")
