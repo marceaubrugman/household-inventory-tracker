@@ -1,5 +1,12 @@
 from src.menu import show_menu, get_user_choice
-from src.inventory_service import add_item, list_items, search_items, update_item, delete_item
+from src.inventory_service import (
+    add_item,
+    list_items,
+    search_items,
+    update_item,
+    delete_item,
+    get_low_stock_items,
+)
 from src.display import print_items
 
 
@@ -33,7 +40,13 @@ def main():
         elif choice == "5":
             delete_item(items)
         elif choice == "6":
-            print("View low-stock items selected.")
+            low_stock_items = get_low_stock_items(items)
+
+            if not low_stock_items:
+                print("No low-stock items found.")
+            else:
+                print("\nLow-stock items:")
+                print_items(low_stock_items)
         elif choice == "7":
             print("Goodbye.")
             break

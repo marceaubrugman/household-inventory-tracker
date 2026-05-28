@@ -125,4 +125,8 @@ def delete_item(items):
 
 
 def get_low_stock_items(items):
-    pass
+    return [
+        item
+        for item in items
+        if item["quantity"] <= item["minimum_quantity"]
+    ]
