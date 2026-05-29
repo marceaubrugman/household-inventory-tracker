@@ -69,3 +69,4 @@ household-inventory-tracker/
 └── tests/
     ├── __init__.py
     └── test_inventory_service.py
+```
