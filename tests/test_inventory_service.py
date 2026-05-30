@@ -86,3 +86,37 @@ def test_get_low_stock_items_returns_items_at_or_below_minimum():
     assert "Rice" in names
     assert "Dish Soap" in names
     assert "Toilet Paper" not in names
+
+
+def test_search_items_with_empty_string_returns_all_items():
+    items = sample_items()
+    results = search_items(items, "")
+
+    assert len(results) == len(items)
+
+
+def test_get_low_stock_items_returns_empty_list_when_all_items_are_above_minimum():
+    items = [
+        {
+            "id": 1,
+            "name": "Pasta",
+            "category": "Food",
+            "location": "Pantry",
+            "quantity": 5,
+            "minimum_quantity": 2,
+            "notes": "",
+        },
+        {
+            "id": 2,
+            "name": "Shampoo",
+            "category": "Bathroom",
+            "location": "Bathroom Cabinet",
+            "quantity": 3,
+            "minimum_quantity": 1,
+            "notes": "",
+        },
+    ]
+
+    results = get_low_stock_items(items)
+
+    assert results == []
