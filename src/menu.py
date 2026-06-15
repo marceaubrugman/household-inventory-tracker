@@ -1,5 +1,5 @@
 def show_menu():
-    print("\nHousehold Inventory Tracker v0")
+    print("\nHousehold Inventory Tracker v0.1")
     print("1. Add item")
     print("2. View all items")
     print("3. Search items")

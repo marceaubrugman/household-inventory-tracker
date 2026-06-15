@@ -2,8 +2,10 @@ from src.validators import (
     get_non_empty_input,
     get_non_negative_int,
     get_positive_int,
+    get_positive_int_or_cancel,
     get_optional_non_empty_input,
     get_optional_non_negative_int,
+
 )
 from src.display import print_items, print_item
 
@@ -36,6 +38,7 @@ def add_item(items):
 
     items.append(item)
     print(f"Item '{name}' added successfully.")
+    return True
 
 
 def list_items(items):
@@ -70,14 +73,19 @@ def update_item(items):
 
     if not items:
         print("No items in inventory.")
-        return
+        return False
 
-    item_id = get_positive_int("Enter item ID to update: ")
+    item_id = get_positive_int_or_cancel("Enter item ID to update: ")
+
+    if item_id is None:
+        print("Update cancelled.")
+        return False
+
     item = find_item_by_id(items, item_id)
 
     if item is None:
         print(f"No item found with ID {item_id}.")
-        return
+        return False
 
     print("\nCurrent item details:")
     print_item(item)
@@ -96,6 +104,7 @@ def update_item(items):
     item["notes"] = item["notes"] if new_notes == "" else new_notes
 
     print(f"Item ID {item_id} updated successfully.")
+    return True
 
 
 def delete_item(items):
@@ -103,14 +112,19 @@ def delete_item(items):
 
     if not items:
         print("No items in inventory.")
-        return
+        return False
 
-    item_id = get_positive_int("Enter item ID to delete: ")
+    item_id = get_positive_int_or_cancel("Enter item ID to delete: ")
+
+    if item_id is None:
+        print("Deletion cancelled.")
+        return False
+
     item = find_item_by_id(items, item_id)
 
     if item is None:
         print(f"No item found with ID {item_id}.")
-        return
+        return False
 
     print("\nItem to delete:")
     print_item(item)
@@ -120,8 +134,10 @@ def delete_item(items):
     if confirmation == "y":
         items.remove(item)
         print(f"Item ID {item_id} deleted successfully.")
+        return True
     else:
         print("Deletion cancelled.")
+        return False
 
 
 def get_low_stock_items(items):

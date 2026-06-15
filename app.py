@@ -20,7 +20,8 @@ def main():
         choice = get_user_choice()
 
         if choice == "1":
-            add_item(items)
+           if add_item(items):
+               save_inventory(items)
         elif choice == "2":
             list_items(items)
         elif choice == "3":
@@ -37,9 +38,11 @@ def main():
                     print(f"\nSearch results for '{search_term}':")
                     print_items(matching_items)
         elif choice == "4":
-            update_item(items)
+            if update_item(items):
+                save_inventory(items)
         elif choice == "5":
-            delete_item(items)
+            if delete_item(items):
+                save_inventory(items)
         elif choice == "6":
             low_stock_items = get_low_stock_items(items)
 

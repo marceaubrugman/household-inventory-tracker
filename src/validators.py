@@ -61,3 +61,20 @@ def get_optional_non_negative_int(prompt, current_value):
                 return value
         except ValueError:
             print("Please enter a valid whole number.")
+
+
+def get_positive_int_or_cancel(prompt):
+    while True:
+        raw_value = input(f"{prompt} (or 'q' to cancel): ").strip().lower()
+
+        if raw_value == "q":
+            return None
+
+        try:
+            value = int(raw_value)
+            if value <= 0:
+                print("Please enter a number greater than 0.")
+            else:
+                return value
+        except ValueError:
+            print("Please enter a valid whole number or 'q' to cancel.")
