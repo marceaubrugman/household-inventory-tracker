@@ -25,7 +25,7 @@ def main():
         elif choice == "2":
             list_items(items)
         elif choice == "3":
-            search_term = input("Enter item name to search: ").strip()
+            search_term = input("Enter search term (name, category, or location): ").strip()
 
             if not search_term:
                 print("Search term cannot be empty.")
@@ -33,7 +33,7 @@ def main():
                 matching_items = search_items(items, search_term)
 
                 if not matching_items:
-                    print(f"No items found matching '{search_term}'.")
+                    print(f"No items found for search term '{search_term}'.")
                 else:
                     print(f"\nSearch results for '{search_term}':")
                     print_items(matching_items)

@@ -58,6 +58,8 @@ def search_items(items, search_term):
         item
         for item in items
         if normalized_search_term in item["name"].lower()
+           or normalized_search_term in item["category"].lower()
+           or normalized_search_term in item["location"].lower()
     ]
 
 
