@@ -148,3 +148,10 @@ def get_low_stock_items(items):
         for item in items
         if item["quantity"] <= item["minimum_quantity"]
     ]
+
+
+def sort_items(items, sort_key="name"):
+    if sort_key == "quantity":
+        return sorted(items, key=lambda item: item["quantity"])
+
+    return sorted(items, key=lambda item: item[sort_key].lower())

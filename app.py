@@ -6,6 +6,7 @@ from src.inventory_service import (
     update_item,
     delete_item,
     get_low_stock_items,
+    sort_items,
 )
 from src.display import print_items
 from src.storage import load_inventory, save_inventory
@@ -23,7 +24,24 @@ def main():
            if add_item(items):
                save_inventory(items)
         elif choice == "2":
-            list_items(items)
+            print("\nSort by:")
+            print("1. Name")
+            print("2. Category")
+            print("3. Location")
+            print("4. Quantity")
+
+            sort_choice = input("Choose sorting option: ").strip()
+
+            sort_map = {
+                "1": "name",
+                "2": "category",
+                "3": "location",
+                "4": "quantity",
+            }
+
+            sort_key = sort_map.get(sort_choice, "name")
+            sorted_items = sort_items(items, sort_key)
+            list_items(sorted_items)
         elif choice == "3":
             search_term = input("Enter search term (name, category, or location): ").strip()
 

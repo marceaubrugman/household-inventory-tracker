@@ -12,5 +12,5 @@ def print_item(item):
 
 
 def print_items(items):
-    for item in sorted(items, key=lambda item: item["name"].lower()):
+    for item in items:
         print_item(item)
