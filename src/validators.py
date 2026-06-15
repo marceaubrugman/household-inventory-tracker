@@ -78,3 +78,7 @@ def get_positive_int_or_cancel(prompt):
                 return value
         except ValueError:
             print("Please enter a valid whole number or 'q' to cancel.")
+
+
+def normalize_text(value):
+    return value.strip().capitalize()

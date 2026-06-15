@@ -5,6 +5,7 @@ from src.validators import (
     get_positive_int_or_cancel,
     get_optional_non_empty_input,
     get_optional_non_negative_int,
+    normalize_text,
 
 )
 from src.display import print_items, print_item
@@ -19,9 +20,9 @@ def get_next_id(items):
 def add_item(items):
     print("\nAdd New Item")
 
-    name = get_non_empty_input("Name: ")
-    category = get_non_empty_input("Category: ")
-    location = get_non_empty_input("Location: ")
+    name = normalize_text(get_non_empty_input("Name: "))
+    category = normalize_text(get_non_empty_input("Category: "))
+    location = normalize_text(get_non_empty_input("Location: "))
     quantity = get_non_negative_int("Quantity: ")
     minimum_quantity = get_non_negative_int("Minimum quantity: ")
     notes = input("Notes: ").strip()
@@ -93,9 +94,9 @@ def update_item(items):
     print_item(item)
     print("Press Enter to keep the current value.")
 
-    item["name"] = get_optional_non_empty_input("Name", item["name"])
-    item["category"] = get_optional_non_empty_input("Category", item["category"])
-    item["location"] = get_optional_non_empty_input("Location", item["location"])
+    item["name"] = normalize_text(get_optional_non_empty_input("Name", item["name"]))
+    item["category"] = normalize_text(get_optional_non_empty_input("Category", item["category"]))
+    item["location"] = normalize_text(get_optional_non_empty_input("Location", item["location"]))
     item["quantity"] = get_optional_non_negative_int("Quantity", item["quantity"])
     item["minimum_quantity"] = get_optional_non_negative_int(
         "Minimum quantity", item["minimum_quantity"]
