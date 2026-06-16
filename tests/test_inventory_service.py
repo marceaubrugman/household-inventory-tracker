@@ -1,8 +1,9 @@
 from src.inventory_service import (
-    get_next_id,
-    search_items,
     find_item_by_id,
     get_low_stock_items,
+    get_next_id,
+    search_items,
+    sort_items,
 )
 
 
@@ -36,6 +37,43 @@ def sample_items():
             "notes": "",
         },
     ]
+
+
+def test_sort_items_sorts_quantity_numerically():
+    items = [
+        {
+            "id": 1,
+            "name": "Rice",
+            "category": "Food",
+            "location": "Pantry",
+            "quantity": 10,
+            "minimum_quantity": 2,
+            "notes": "",
+        },
+        {
+            "id": 2,
+            "name": "Pasta",
+            "category": "Food",
+            "location": "Pantry",
+            "quantity": 2,
+            "minimum_quantity": 1,
+            "notes": "",
+        },
+        {
+            "id": 3,
+            "name": "Soap",
+            "category": "Cleaning",
+            "location": "Cupboard",
+            "quantity": 1,
+            "minimum_quantity": 1,
+            "notes": "",
+        },
+    ]
+
+    results = sort_items(items, "quantity")
+    quantities = [item["quantity"] for item in results]
+
+    assert quantities == [1, 2, 10]
 
 
 def test_get_next_id_returns_1_for_empty_list():
@@ -120,3 +158,20 @@ def test_get_low_stock_items_returns_empty_list_when_all_items_are_above_minimum
     results = get_low_stock_items(items)
 
     assert results == []
+
+def test_search_items_finds_category_match():
+    items = sample_items()
+
+    results = search_items(items, "cleaning")
+
+    assert len(results) == 1
+    assert results[0]["name"] == "Dish Soap"
+
+
+def test_search_items_finds_location_match_case_insensitively():
+    items = sample_items()
+
+    results = search_items(items, "UPSTAIRS CLOSET")
+
+    assert len(results) == 1
+    assert results[0]["name"] == "Toilet Paper"
