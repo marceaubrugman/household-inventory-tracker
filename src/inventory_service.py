@@ -1,12 +1,11 @@
 from src.validators import (
     get_non_empty_input,
     get_non_negative_int,
-    get_positive_int,
     get_positive_int_or_cancel,
     get_optional_non_empty_input,
     get_optional_non_negative_int,
+    get_optional_notes,
     normalize_text,
-
 )
 from src.display import print_items, print_item
 
@@ -102,9 +101,7 @@ def update_item(items):
         "Minimum quantity", item["minimum_quantity"]
     )
 
-    current_notes = item["notes"] if item["notes"] else "-"
-    new_notes = input(f"Notes [{current_notes}]: ").strip()
-    item["notes"] = item["notes"] if new_notes == "" else new_notes
+    item["notes"] = get_optional_notes("Notes", item["notes"])
 
     print(f"Item ID {item_id} updated successfully.")
     return True

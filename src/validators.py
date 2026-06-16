@@ -82,3 +82,20 @@ def get_positive_int_or_cancel(prompt):
 
 def normalize_text(value):
     return value.strip().capitalize()
+
+
+def get_optional_notes(prompt, current_value):
+    display_value = current_value if current_value else "-"
+
+    value = input(
+        f"{prompt} [{display_value}] "
+        "(Enter to keep, '-' to clear): "
+    ).strip()
+
+    if value == "":
+        return current_value
+
+    if value == "-":
+        return ""
+
+    return value
