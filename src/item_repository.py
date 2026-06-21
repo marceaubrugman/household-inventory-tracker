@@ -131,3 +131,68 @@ def search_items(search_term):
         with connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(query, parameters)
             return cursor.fetchall()
+
+
+def update_item(
+    item_id,
+    name,
+    category,
+    location,
+    quantity,
+    minimum_quantity,
+    notes,
+):
+    query = """
+        UPDATE hit.items
+        SET
+            name = %s,
+            category = %s,
+            location = %s,
+            quantity = %s,
+            minimum_quantity = %s,
+            notes = %s
+        WHERE id = %s
+        RETURNING
+            id,
+            name,
+            category,
+            location,
+            quantity,
+            minimum_quantity,
+            notes;
+    """
+
+    parameters = (
+        name,
+        category,
+        location,
+        quantity,
+        minimum_quantity,
+        notes,
+        item_id,
+    )
+
+    with get_connection() as connection:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(query, parameters)
+            return cursor.fetchone()
+
+
+def delete_item(item_id):
+    query = """
+        DELETE FROM hit.items
+        WHERE id = %s
+        RETURNING
+            id,
+            name,
+            category,
+            location,
+            quantity,
+            minimum_quantity,
+            notes;
+    """
+
+    with get_connection() as connection:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(query, (item_id,))
+            return cursor.fetchone()
