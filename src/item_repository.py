@@ -1,6 +1,15 @@
+from psycopg import sql
 from psycopg.rows import dict_row
 
 from src.database import get_connection
+
+
+SORT_EXPRESSIONS = {
+    "name": sql.SQL("LOWER(name)"),
+    "category": sql.SQL("LOWER(category)"),
+    "location": sql.SQL("LOWER(location)"),
+    "quantity": sql.Identifier("quantity"),
+}
 
 
 def _escape_like_pattern(value):
@@ -10,6 +19,15 @@ def _escape_like_pattern(value):
         .replace("%", "!%")
         .replace("_", "!_")
     )
+
+
+def _get_sort_expression(sort_key):
+    try:
+        return SORT_EXPRESSIONS[sort_key]
+    except KeyError as error:
+        raise ValueError(
+            f"Unsupported sort key: {sort_key}"
+        ) from error
 
 
 def create_item(
@@ -60,8 +78,11 @@ def create_item(
     return created_item
 
 
-def get_all_items():
-    query = """
+def get_all_items(sort_key="name"):
+    sort_expression = _get_sort_expression(sort_key)
+
+    query = sql.SQL(
+        """
         SELECT
             id,
             name,
@@ -71,8 +92,11 @@ def get_all_items():
             minimum_quantity,
             notes
         FROM hit.items
-        ORDER BY LOWER(name), id;
-    """
+        ORDER BY {sort_expression}, id;
+        """
+    ).format(
+        sort_expression=sort_expression
+    )
 
     with get_connection() as connection:
         with connection.cursor(row_factory=dict_row) as cursor:
@@ -196,3 +220,30 @@ def delete_item(item_id):
         with connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute(query, (item_id,))
             return cursor.fetchone()
+
+
+def get_low_stock_items(sort_key="name"):
+    sort_expression = _get_sort_expression(sort_key)
+
+    query = sql.SQL(
+        """
+        SELECT
+            id,
+            name,
+            category,
+            location,
+            quantity,
+            minimum_quantity,
+            notes
+        FROM hit.items
+        WHERE quantity <= minimum_quantity
+        ORDER BY {sort_expression}, id;
+        """
+    ).format(
+        sort_expression=sort_expression
+    )
+
+    with get_connection() as connection:
+        with connection.cursor(row_factory=dict_row) as cursor:
+            cursor.execute(query)
+            return cursor.fetchall()
