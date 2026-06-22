@@ -1,4 +1,5 @@
 def show_menu():
+    """Display the main application menu."""
     print(
         "\nHousehold Inventory Tracker "
         "v0.2 PostgreSQL"
@@ -13,4 +14,5 @@ def show_menu():
 
 
 def get_user_choice():
+    """Return the user's stripped menu selection."""
     return input("Choose an option: ").strip()

@@ -13,6 +13,7 @@ SORT_EXPRESSIONS = {
 
 
 def _escape_like_pattern(value):
+    """Escape SQL LIKE wildcard characters in a search value."""
     return (
         value
         .replace("!", "!!")
@@ -22,6 +23,7 @@ def _escape_like_pattern(value):
 
 
 def _get_sort_expression(sort_key):
+    """Return an approved SQL sort expression."""
     try:
         return SORT_EXPRESSIONS[sort_key]
     except KeyError as error:
@@ -38,6 +40,7 @@ def create_item(
     minimum_quantity,
     notes="",
 ):
+    """Insert an inventory item and return the created row."""
     query = """
         INSERT INTO hit.items (
             name,
@@ -79,6 +82,7 @@ def create_item(
 
 
 def get_all_items(sort_key="name"):
+    """Return all inventory items in the requested sort order."""
     sort_expression = _get_sort_expression(sort_key)
 
     query = sql.SQL(
@@ -105,6 +109,7 @@ def get_all_items(sort_key="name"):
 
 
 def get_item_by_id(item_id):
+    """Return one inventory item by ID, or None if absent."""
     query = """
         SELECT
             id,
@@ -125,6 +130,7 @@ def get_item_by_id(item_id):
 
 
 def search_items(search_term):
+    """Return items matching a literal case-insensitive search term."""
     normalized_term = search_term.strip()
 
     if not normalized_term:
@@ -166,6 +172,7 @@ def update_item(
     minimum_quantity,
     notes,
 ):
+    """Update an inventory item and return the changed row."""
     query = """
         UPDATE hit.items
         SET
@@ -203,6 +210,7 @@ def update_item(
 
 
 def delete_item(item_id):
+    """Delete an inventory item and return the removed row."""
     query = """
         DELETE FROM hit.items
         WHERE id = %s
@@ -223,6 +231,7 @@ def delete_item(item_id):
 
 
 def get_low_stock_items(sort_key="name"):
+    """Return items at or below their minimum quantity."""
     sort_expression = _get_sort_expression(sort_key)
 
     query = sql.SQL(

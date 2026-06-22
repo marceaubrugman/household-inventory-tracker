@@ -20,6 +20,7 @@ SORT_OPTIONS = {
 
 
 def _choose_sort_key():
+    """Return items at or below their minimum quantity."""
     print("\nSort by:")
     print("1. Name")
     print("2. Category")
@@ -37,6 +38,7 @@ def _choose_sort_key():
 
 
 def add_item():
+    """Collect item details and store a new PostgreSQL item."""
     print("\nAdd New Item")
 
     name = normalize_text(get_non_empty_input("Name: "))
@@ -62,6 +64,7 @@ def add_item():
 
 
 def list_items():
+    """Retrieve and display all PostgreSQL inventory items."""
     print("\nInventory Items")
 
     sort_key = _choose_sort_key()
@@ -75,6 +78,7 @@ def list_items():
 
 
 def search_inventory():
+    """Search and display matching PostgreSQL inventory items."""
     print("\nSearch Inventory")
 
     search_term = input(
@@ -99,6 +103,7 @@ def search_inventory():
 
 
 def update_item():
+    """Collect changes and update an existing inventory item."""
     print("\nUpdate Item")
 
     item_id = get_positive_int_or_cancel(
@@ -177,6 +182,7 @@ def update_item():
 
 
 def delete_item():
+    """Confirm and delete an existing inventory item."""
     print("\nDelete Item")
 
     item_id = get_positive_int_or_cancel(
@@ -219,6 +225,7 @@ def delete_item():
 
 
 def show_low_stock_items():
+    """Retrieve and display items at or below minimum stock."""
     print("\nLow-stock Items")
 
     sort_key = _choose_sort_key()
