@@ -245,15 +245,15 @@ The JSON runtime used in v0.1.0 has been removed. JSON remains supported only as
 
 ### Release operations
 
-* [ ] Commit release documentation and cleanup
-* [ ] Push PostgreSQL feature branch
-* [ ] Merge feature branch into `main`
-* [ ] Run complete test suite on `main`
-* [ ] Run application from `main`
-* [ ] Create annotated Git tag `v0.2.0`
-* [ ] Push `main` and `v0.2.0`
-* [ ] Verify GitHub repository and tag
-* [ ] Publish a short LinkedIn milestone post
+* [x] Commit release documentation and cleanup
+* [x] Push PostgreSQL feature branch
+* [x] Merge feature branch into `main`
+* [x] Run complete test suite on `main`
+* [x] Run application from `main`
+* [x] Create annotated Git tag `v0.2.0`
+* [x] Push `main` and `v0.2.0`
+* [x] Verify GitHub repository and tag
+* [x] Publish a short LinkedIn milestone post
 
 ---
 
@@ -263,19 +263,19 @@ The JSON runtime used in v0.1.0 has been removed. JSON remains supported only as
 
 Before beginning new feature development:
 
-* [ ] confirm the documented project structure matches the repository
-* [ ] confirm `README.md` matches the implementation
-* [ ] confirm `DATABASE_PLAN.md` matches the implementation
-* [ ] confirm this backlog matches completed work
-* [ ] run `git diff --check`
-* [ ] inspect `git status`
-* [ ] commit the release preparation
-* [ ] push the feature branch
-* [ ] merge into `main`
-* [ ] rerun all tests on `main`
-* [ ] run the application on `main`
-* [ ] create and push `v0.2.0`
-* [ ] verify that credentials and private data are absent from GitHub
+* [x] confirm the documented project structure matches the repository
+* [x] confirm `README.md` matches the implementation
+* [x] confirm `DATABASE_PLAN.md` matches the implementation
+* [x] confirm this backlog matches completed work
+* [x] run `git diff --check`
+* [x] inspect `git status`
+* [x] commit the release preparation
+* [x] push the feature branch
+* [x] merge into `main`
+* [x] rerun all tests on `main`
+* [x] run the application on `main`
+* [x] create and push `v0.2.0`
+* [x] verify that credentials and private data are absent from GitHub
 
 No new feature development should begin until the release is complete.
 
