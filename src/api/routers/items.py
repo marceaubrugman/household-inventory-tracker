@@ -1,10 +1,14 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 
 from src.api.dependencies import fetch_all_items, fetch_item_by_id
 from src import item_service
-from src.api.schemas import ItemCreate, ItemResponse
+from src.api.schemas import (
+    ItemCreate,
+    ItemResponse,
+    ItemUpdate,
+)
 
 
 
@@ -64,3 +68,33 @@ def create_item_endpoint(
     return item_service.create_inventory_item(
         **item_data.model_dump()
     )
+
+
+@router.patch(
+    "/{item_id}",
+    response_model=ItemResponse,
+    summary="Update an inventory item",
+)
+def update_item_endpoint(
+    item_id: Annotated[
+        int,
+        Path(
+            ge=1,
+            description="Unique inventory item ID",
+        ),
+    ],
+    item_data: ItemUpdate,
+) -> dict[str, Any]:
+    """Partially update and return an inventory item."""
+    updated_item = item_service.update_inventory_item(
+        item_id=item_id,
+        updates=item_data.model_dump(exclude_unset=True),
+    )
+
+    if updated_item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Item not found",
+        )
+
+    return updated_item

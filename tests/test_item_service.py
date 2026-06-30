@@ -123,3 +123,117 @@ def test_create_inventory_item_forwards_creation_data(
         "id": 12,
         **received_data,
     }
+
+
+def test_update_inventory_item_merges_partial_changes(
+    monkeypatch,
+) -> None:
+    """Verify that partial changes are merged with stored data."""
+    repository_updates: dict[str, Any] = {}
+
+    stored_item = {
+        "id": 7,
+        "name": "Rice",
+        "category": "Food",
+        "quantity": 3,
+        "minimum_quantity": 1,
+        "location": "Pantry",
+        "notes": "Basmati",
+    }
+
+    updated_item = {
+        **stored_item,
+        "quantity": 8,
+    }
+
+    lookup_results = iter([stored_item, updated_item])
+
+    def fake_get_item_by_id(
+        item_id: int,
+    ) -> dict[str, Any]:
+        assert item_id == 7
+        return next(lookup_results)
+
+    def fake_update_item(
+        *,
+        item_id: int,
+        name: str,
+        category: str,
+        quantity: int,
+        minimum_quantity: int,
+        location: str,
+        notes: str | None,
+    ) -> None:
+        repository_updates.update(
+            {
+                "item_id": item_id,
+                "name": name,
+                "category": category,
+                "quantity": quantity,
+                "minimum_quantity": minimum_quantity,
+                "location": location,
+                "notes": notes,
+            }
+        )
+
+    monkeypatch.setattr(
+        item_service,
+        "get_item_by_id",
+        fake_get_item_by_id,
+    )
+    monkeypatch.setattr(
+        item_service,
+        "update_item",
+        fake_update_item,
+    )
+
+    result = item_service.update_inventory_item(
+        item_id=7,
+        updates={"quantity": 8},
+    )
+
+    assert repository_updates == {
+        "item_id": 7,
+        "name": "Rice",
+        "category": "Food",
+        "quantity": 8,
+        "minimum_quantity": 1,
+        "location": "Pantry",
+        "notes": "Basmati",
+    }
+    assert result == updated_item
+
+
+def test_update_inventory_item_returns_none_when_missing(
+    monkeypatch,
+) -> None:
+    """Verify that missing items are not sent for update."""
+    update_was_called = False
+
+    def fake_get_item_by_id(
+        _item_id: int,
+    ) -> None:
+        return None
+
+    def fake_update_item(**_item_data: Any) -> None:
+        nonlocal update_was_called
+        update_was_called = True
+
+    monkeypatch.setattr(
+        item_service,
+        "get_item_by_id",
+        fake_get_item_by_id,
+    )
+    monkeypatch.setattr(
+        item_service,
+        "update_item",
+        fake_update_item,
+    )
+
+    result = item_service.update_inventory_item(
+        item_id=999999,
+        updates={"quantity": 8},
+    )
+
+    assert result is None
+    assert update_was_called is False
