@@ -2,12 +2,12 @@ from typing import Annotated, Any
 
 from fastapi import Path
 
-from src.item_repository import get_all_items, get_item_by_id
+from src.item_service import find_inventory_item, list_inventory_items
 
 
 def fetch_all_items() -> list[dict[str, Any]]:
-    """Fetch all inventory items through the repository layer."""
-    return get_all_items()
+    """Fetch all inventory items through the service layer."""
+    return list_inventory_items()
 
 
 def fetch_item_by_id(
@@ -19,5 +19,5 @@ def fetch_item_by_id(
         ),
     ],
 ) -> dict[str, Any] | None:
-    """Fetch one inventory item through the repository layer."""
-    return get_item_by_id(item_id)
+    """Fetch one inventory item through the service layer."""
+    return find_inventory_item(item_id)
