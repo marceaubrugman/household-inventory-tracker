@@ -3,7 +3,8 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.api.dependencies import fetch_all_items, fetch_item_by_id
-from src.api.schemas import ItemResponse
+from src import item_service
+from src.api.schemas import ItemCreate, ItemResponse
 
 
 
@@ -48,3 +49,18 @@ def get_item(
         )
 
     return item
+
+
+@router.post(
+    "",
+    response_model=ItemResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create an inventory item",
+)
+def create_item_endpoint(
+    item_data: ItemCreate,
+) -> dict[str, Any]:
+    """Create and return an inventory item."""
+    return item_service.create_inventory_item(
+        **item_data.model_dump()
+    )

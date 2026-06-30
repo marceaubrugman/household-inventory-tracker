@@ -62,3 +62,64 @@ def test_find_inventory_item_returns_none_when_missing(
     result = item_service.find_inventory_item(999999)
 
     assert result is None
+
+
+def test_create_inventory_item_forwards_creation_data(
+    monkeypatch,
+) -> None:
+    """Verify that item creation delegates to the repository."""
+    received_data: dict[str, Any] = {}
+
+    def fake_create_item(
+        *,
+        name: str,
+        category: str,
+        quantity: int,
+        minimum_quantity: int,
+        location: str,
+        notes: str | None,
+    ) -> dict[str, Any]:
+        received_data.update(
+            {
+                "name": name,
+                "category": category,
+                "quantity": quantity,
+                "minimum_quantity": minimum_quantity,
+                "location": location,
+                "notes": notes,
+            }
+        )
+
+        return {
+            "id": 12,
+            **received_data,
+        }
+
+    monkeypatch.setattr(
+        item_service,
+        "create_item",
+        fake_create_item,
+    )
+
+    result = item_service.create_inventory_item(
+        name="Rice",
+        category="Food",
+        quantity=3,
+        minimum_quantity=1,
+        location="Pantry",
+        notes="Basmati",
+    )
+
+    assert received_data == {
+        "name": "Rice",
+        "category": "Food",
+        "quantity": 3,
+        "minimum_quantity": 1,
+        "location": "Pantry",
+        "notes": "Basmati",
+    }
+
+    assert result == {
+        "id": 12,
+        **received_data,
+    }
