@@ -237,3 +237,69 @@ def test_update_inventory_item_returns_none_when_missing(
 
     assert result is None
     assert update_was_called is False
+
+
+def test_delete_inventory_item_deletes_existing_item(
+    monkeypatch,
+) -> None:
+    """Verify that an existing item is sent to the repository for deletion."""
+    deleted_ids: list[int] = []
+
+    def fake_get_item_by_id(
+        item_id: int,
+    ) -> dict[str, Any]:
+        assert item_id == 7
+        return {"id": item_id}
+
+    def fake_delete_item(item_id: int) -> None:
+        deleted_ids.append(item_id)
+
+    monkeypatch.setattr(
+        item_service,
+        "get_item_by_id",
+        fake_get_item_by_id,
+    )
+    monkeypatch.setattr(
+        item_service,
+        "delete_item",
+        fake_delete_item,
+    )
+
+    result = item_service.delete_inventory_item(7)
+
+    assert result is True
+    assert deleted_ids == [7]
+
+
+def test_delete_inventory_item_does_not_delete_missing_item(
+    monkeypatch,
+) -> None:
+    """Verify that a missing item is not sent for deletion."""
+    delete_was_called = False
+
+    def fake_get_item_by_id(
+        _item_id: int,
+    ) -> None:
+        return None
+
+    def fake_delete_item(_item_id: int) -> None:
+        nonlocal delete_was_called
+        delete_was_called = True
+
+    monkeypatch.setattr(
+        item_service,
+        "get_item_by_id",
+        fake_get_item_by_id,
+    )
+    monkeypatch.setattr(
+        item_service,
+        "delete_item",
+        fake_delete_item,
+    )
+
+    result = item_service.delete_inventory_item(999999)
+
+    assert result is False
+    assert delete_was_called is False
+
+

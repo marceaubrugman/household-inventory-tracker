@@ -1,6 +1,13 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    Path,
+    Response,
+    status,
+)
 
 from src.api.dependencies import fetch_all_items, fetch_item_by_id
 from src import item_service
@@ -98,3 +105,29 @@ def update_item_endpoint(
         )
 
     return updated_item
+
+
+@router.delete(
+    "/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete an inventory item",
+)
+def delete_item_endpoint(
+    item_id: Annotated[
+        int,
+        Path(
+            ge=1,
+            description="Unique inventory item ID",
+        ),
+    ],
+) -> Response:
+    """Delete an inventory item."""
+    deleted = item_service.delete_inventory_item(item_id)
+
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Item not found",
+        )
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

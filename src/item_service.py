@@ -2,6 +2,7 @@ from typing import Any
 
 from src.item_repository import (
     create_item,
+    delete_item,
     get_all_items,
     get_item_by_id,
     update_item,
@@ -82,3 +83,14 @@ def update_inventory_item(
     )
 
     return get_item_by_id(item_id)
+
+
+def delete_inventory_item(item_id: int) -> bool:
+    """Delete an inventory item and report whether it existed."""
+    current_item = get_item_by_id(item_id)
+
+    if current_item is None:
+        return False
+
+    delete_item(item_id)
+    return True
