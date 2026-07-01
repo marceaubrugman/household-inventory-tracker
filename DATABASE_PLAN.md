@@ -6,23 +6,28 @@ This document describes the database architecture of the Household Inventory Tra
 
 It records:
 
-* the PostgreSQL implementation completed in v0.2.0
-* the responsibilities of the database layer
+* the PostgreSQL implementation introduced in v0.2.0
+* how the FastAPI interface added in v0.3.0 reuses the same database foundation
+* the responsibilities of the database, repository, service, and interface layers
 * current security and integrity decisions
 * the migration path from JSON
 * likely future database evolution
 
-The current database model is intentionally simple. Its purpose is to provide a reliable PostgreSQL foundation before introducing APIs, users, households, audit history, and more advanced search.
+The current database model is intentionally simple. Its purpose is to provide a reliable PostgreSQL foundation before introducing users, households, audit history, structured locations, formal schema migrations, and more advanced search.
 
 ## Current Status
 
-**Implemented in HIT v0.2.0**
+**Implemented through HIT v0.3.0**
 
-PostgreSQL is now the primary source of truth for inventory data.
+PostgreSQL is the primary source of truth for inventory data.
 
 The previous JSON runtime storage has been removed from the application. JSON remains supported only as a legacy migration source.
 
-The current persistence flow is:
+No database schema migration was required for v0.3.0. The FastAPI interface reuses the same PostgreSQL schema and repository layer introduced in v0.2.0.
+
+## Current Persistence Architecture
+
+### Console path
 
 ```text
 app.py
@@ -36,23 +41,66 @@ database.py
 PostgreSQL
 ```
 
-## Current Database Structure
+### API path
 
-### Database
+```text
+Uvicorn
+   ↓
+FastAPI
+   ↓
+API routers and dependencies
+   ↓
+item_service.py
+   ↓
+item_repository.py
+   ↓
+database.py
+   ↓
+PostgreSQL
+```
 
-Development database:
+The console and FastAPI interfaces use the same PostgreSQL schema, repository functions, and connection layer.
+
+FastAPI does not connect directly to PostgreSQL. API requests pass through Python application, repository, and database layers.
+
+## Database Environments
+
+### Development database
 
 ```text
 hit_db
 ```
 
-Integration-test database:
+Used by:
+
+* the console application
+* the FastAPI application
+* database connection diagnostics
+* manual development and smoke testing
+
+The connection string is read from:
+
+```text
+DATABASE_URL
+```
+
+### Integration-test database
 
 ```text
 hit_test
 ```
 
-### Schema
+Used only by PostgreSQL integration tests.
+
+The connection string is read from:
+
+```text
+TEST_DATABASE_URL
+```
+
+The development and test databases must remain separate.
+
+## PostgreSQL Schema
 
 HIT database objects are stored in:
 
@@ -60,27 +108,19 @@ HIT database objects are stored in:
 hit
 ```
 
-### Table
-
 The current inventory table is:
 
 ```text
 hit.items
 ```
 
-Its fully qualified PostgreSQL name is:
-
-```text
-hit.items
-```
-
-## Current Schema Definition
-
-The schema is defined in:
+The schema definition is stored in:
 
 ```text
 sql/schema.sql
 ```
+
+## Current Schema Definition
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS hit;
@@ -122,7 +162,7 @@ Purpose:
 VARCHAR(100) NOT NULL
 ```
 
-The human-readable name of the item.
+The human-readable item name.
 
 Examples:
 
@@ -149,7 +189,7 @@ Bathroom
 Electronics
 ```
 
-Categories are currently stored directly on each item. They may become a separate table in a later version if reusable metadata or category management becomes necessary.
+Categories are currently stored directly on each item. They may become a separate table later if reusable metadata, category management, reporting, or permissions require it.
 
 ### `location`
 
@@ -180,9 +220,10 @@ The current stock quantity.
 
 Zero is valid and represents an item that is known but currently unavailable.
 
-Negative values are rejected by both:
+Negative values are rejected by:
 
-* Python validation
+* console validation
+* Pydantic API validation
 * PostgreSQL constraints
 
 ### `minimum_quantity`
@@ -199,7 +240,7 @@ The current low-stock rule is:
 quantity <= minimum_quantity
 ```
 
-This means an item is considered low stock when its quantity is:
+An item is therefore low stock when its quantity is:
 
 * below the configured minimum
 * exactly equal to the configured minimum
@@ -212,7 +253,7 @@ TEXT NOT NULL DEFAULT ''
 
 Optional free-form information about an item.
 
-An empty note is stored as:
+The current PostgreSQL representation stores an empty note as:
 
 ```text
 ''
@@ -220,11 +261,11 @@ An empty note is stored as:
 
 rather than `NULL`.
 
-This keeps the current Python and PostgreSQL representations consistent.
+The API may accept `null` when clearing notes, but the repository and database normalize the persisted value according to the current schema contract.
 
-## Implemented Database Operations
+## Repository Operations
 
-The PostgreSQL repository supports complete CRUD functionality.
+The PostgreSQL repository supports complete CRUD functionality plus search, sorting, and low-stock retrieval.
 
 ## Create
 
@@ -234,7 +275,7 @@ Repository function:
 create_item(...)
 ```
 
-SQL behaviour:
+SQL behavior:
 
 ```sql
 INSERT INTO hit.items (...)
@@ -243,6 +284,11 @@ RETURNING ...;
 ```
 
 PostgreSQL generates the item ID and returns the complete created row.
+
+Used by:
+
+* console workflows
+* FastAPI service operations
 
 ## Read All
 
@@ -261,6 +307,8 @@ Supported sort keys:
 * location
 * quantity
 
+The FastAPI `GET /items` endpoint currently reuses this repository operation through `item_service.py`.
+
 ## Read One
 
 Repository function:
@@ -269,7 +317,7 @@ Repository function:
 get_item_by_id(item_id)
 ```
 
-SQL behaviour:
+SQL behavior:
 
 ```sql
 SELECT ...
@@ -281,6 +329,12 @@ The function returns:
 
 * one item dictionary when found
 * `None` when no matching ID exists
+
+The API converts `None` into:
+
+```text
+404 Not Found
+```
 
 ## Search
 
@@ -308,6 +362,8 @@ WHERE name ILIKE pattern
 
 User-supplied `%` and `_` characters are escaped so they are treated literally rather than as unintended SQL pattern wildcards.
 
+Search remains available through the console. A dedicated API search capability is planned for a later version.
+
 ## Update
 
 Repository function:
@@ -316,7 +372,7 @@ Repository function:
 update_item(...)
 ```
 
-SQL behaviour:
+SQL behavior:
 
 ```sql
 UPDATE hit.items
@@ -327,6 +383,16 @@ RETURNING ...;
 
 The complete updated row is returned when the item exists.
 
+For the API:
+
+1. `item_service.py` loads the current item
+2. merges only supplied PATCH fields
+3. rejects unsupported update fields
+4. sends a complete update to the repository
+5. returns the refreshed item
+
+This keeps HTTP partial-update behavior out of the repository and SQL layers.
+
 ## Delete
 
 Repository function:
@@ -335,7 +401,7 @@ Repository function:
 delete_item(item_id)
 ```
 
-SQL behaviour:
+SQL behavior:
 
 ```sql
 DELETE FROM hit.items
@@ -343,7 +409,15 @@ WHERE id = %s
 RETURNING ...;
 ```
 
-The deleted row is returned so the application can confirm exactly what was removed.
+The deleted row is returned so the console application can confirm exactly what was removed.
+
+The API currently translates successful deletion into:
+
+```text
+204 No Content
+```
+
+The API does not return the deleted row, even though the repository makes it available.
 
 ## Low-Stock Retrieval
 
@@ -360,6 +434,8 @@ WHERE quantity <= minimum_quantity
 ```
 
 This avoids retrieving the complete inventory and filtering it in Python.
+
+Low-stock retrieval remains available through the console. A dedicated API endpoint or query parameter is planned for a later version.
 
 ## Sorting Strategy
 
@@ -410,7 +486,7 @@ ValueError
 
 ## SQL Security
 
-### Parameterized Statements
+### Parameterized statements
 
 All user-controlled values are passed separately from SQL statements:
 
@@ -436,13 +512,28 @@ Parameterized execution is used for:
 * search patterns
 * item IDs
 
-### SQL Identifiers
+### SQL identifiers and expressions
 
 Dynamic SQL expressions such as sorting columns are handled through:
 
 * a fixed allowlist
 * Psycopg SQL composition
 * approved `sql.SQL` and `sql.Identifier` objects
+
+### API input boundaries
+
+The FastAPI interface adds another defensive layer through Pydantic validation.
+
+The API currently validates:
+
+* required text fields
+* string lengths
+* non-negative quantities
+* positive integer item IDs
+* partial update bodies
+* required fields that may not be set to `null`
+
+Pydantic validation improves the HTTP client experience, but PostgreSQL constraints remain the final data-integrity boundary.
 
 ### Credentials
 
@@ -460,9 +551,9 @@ Integration tests read:
 TEST_DATABASE_URL
 ```
 
-Real connection strings remain in local environment or PyCharm run configurations and are excluded from Git.
+Real connection strings remain in local environment variables or PyCharm run configurations and are excluded from Git.
 
-### Connection Timeout
+### Connection timeout
 
 Database connections use an explicit timeout:
 
@@ -470,21 +561,46 @@ Database connections use an explicit timeout:
 connect_timeout=5
 ```
 
-This prevents the application from appearing to hang indefinitely when PostgreSQL is unavailable.
+This prevents the console or API from appearing to hang indefinitely when PostgreSQL is unavailable.
 
-### Database Errors
+## Database Error Handling
 
-Expected Psycopg failures are handled at the application boundary.
+### Console boundary
+
+Expected Psycopg failures are handled at the console application boundary.
 
 The user receives a safe message instead of raw database details.
 
-Technical database information is not printed directly to the console.
+### API boundary
+
+The FastAPI application uses global exception handlers.
+
+Current API behavior:
+
+```text
+Missing DATABASE_URL
+    → 503 Service Unavailable
+
+Psycopg OperationalError
+    → server-side log entry
+    → 503 Service Unavailable
+
+Missing inventory item
+    → 404 Not Found
+
+Invalid path or request body
+    → 422 Unprocessable Entity
+```
+
+Technical database information is not included in public API responses.
+
+Programming defects and malformed SQL are not broadly converted into `503` responses. They remain visible as server errors so they can be diagnosed rather than disguised as infrastructure outages.
 
 ## Data Integrity
 
 Data integrity is protected at multiple levels.
 
-### Application layer
+### Console application layer
 
 Python validators reject:
 
@@ -492,6 +608,26 @@ Python validators reject:
 * negative quantities
 * invalid IDs
 * malformed menu input
+
+### API application layer
+
+Pydantic and service validation reject:
+
+* blank required text
+* negative quantities
+* empty PATCH bodies
+* invalid item IDs
+* unsupported update fields
+* attempts to clear required fields
+
+### Repository layer
+
+The repository:
+
+* uses parameterized SQL
+* allowlists dynamic sort expressions
+* keeps SQL isolated from interfaces
+* returns predictable dictionaries or `None`
 
 ### Database layer
 
@@ -502,12 +638,14 @@ PostgreSQL enforces:
 * non-negative quantities through `CHECK`
 * default empty notes
 
-This creates defence in depth:
+This creates defense in depth:
 
 ```text
-user input
+console input or HTTP request
    ↓
-Python validation
+Python or Pydantic validation
+   ↓
+service rules where applicable
    ↓
 parameterized repository operation
    ↓
@@ -536,7 +674,7 @@ More complex multi-step transactions may be introduced later when HIT supports w
 
 ## JSON Migration
 
-HIT v0.2.0 includes:
+HIT includes:
 
 ```text
 scripts/migrate_json_to_postgres.py
@@ -577,19 +715,39 @@ If any database operation fails, the complete migration is rolled back.
 
 ## Testing Strategy
 
-## Unit Tests
+## Unit and service tests
 
-Unit tests cover logic that does not require PostgreSQL, including:
+Tests that do not require PostgreSQL cover:
 
-* input validation
+* console input validation
 * migration-data validation
 * duplicate-ID rejection
 * required migration fields
 * quantity validation
+* application-service behavior
+* partial-update merging
+* deletion outcomes
 
-These tests can run without Docker or database credentials.
+These tests use fakes and pytest monkeypatching.
 
-## PostgreSQL Integration Tests
+## API endpoint tests
+
+FastAPI endpoint tests cover:
+
+* health checks
+* list retrieval
+* single-item retrieval
+* creation
+* partial updates
+* deletion
+* missing records
+* invalid input
+* missing database configuration
+* PostgreSQL operational failures
+
+FastAPI dependency overrides and monkeypatching keep these tests isolated from PostgreSQL.
+
+## PostgreSQL integration tests
 
 Integration tests execute the real repository functions against:
 
@@ -609,7 +767,7 @@ They verify:
 * low-stock retrieval
 * PostgreSQL constraint enforcement
 
-## Test Isolation
+## Test isolation
 
 The integration fixture:
 
@@ -623,19 +781,21 @@ The integration fixture:
 
 The safety check protects `hit_db` from accidental integration-test cleanup.
 
+When `TEST_DATABASE_URL` is absent, integration tests skip intentionally.
+
 ## Current Database Decisions
 
 ### One inventory table
 
 The current schema uses one table deliberately.
 
-This keeps the first PostgreSQL version:
+This keeps the current PostgreSQL model:
 
 * understandable
 * testable
 * easy to migrate
 * suitable for learning direct SQL
-* ready for a future API layer
+* reusable by both console and API interfaces
 
 Categories and locations are not normalized yet because the application does not currently require:
 
@@ -654,12 +814,34 @@ HIT currently uses direct SQL through Psycopg rather than SQLAlchemy.
 Reasons:
 
 * reinforces PostgreSQL and SQL knowledge
-* keeps database behaviour visible
+* keeps database behavior visible
 * supports secure parameter binding
 * avoids introducing an abstraction before the schema stabilizes
-* creates stronger foundations for understanding future ORM behaviour
+* creates stronger foundations for understanding future ORM behavior
+* keeps the current repository layer explicit and testable
 
 An ORM may be considered later, but it is not required for the current application.
+
+### Shared repository across interfaces
+
+Both interfaces reuse:
+
+```text
+item_repository.py
+database.py
+PostgreSQL schema
+```
+
+This avoids:
+
+* duplicate SQL
+* inconsistent persistence rules
+* interface-specific database behavior
+* separate sources of truth
+
+The API adds `item_service.py` above the repository for application operations such as partial-update merging.
+
+The console currently retains `inventory_workflows.py` as its coordination layer.
 
 ## Current Limitations
 
@@ -680,34 +862,33 @@ The current database model does not yet support:
 * full-text search
 * semantic search
 * trusted-successor access
-* cloud deployment
+* production deployment
 
-These are future product capabilities, not requirements for v0.2.0.
+The API also does not yet expose:
 
-## Planned Next Stage
+* search queries
+* sorting options
+* low-stock retrieval
+* pagination
 
-The next major development stage is a FastAPI service layer.
+These are future capabilities, not unfinished v0.3.0 work.
 
-The initial API should reuse:
+## Next Major Stage
 
-* `database.py`
-* `item_repository.py`
-* PostgreSQL schema
-* validation principles
-* integration-test patterns
+The next major development stage is Dockerized local development.
 
-Likely first API capabilities:
+The database goals for that stage are:
 
-* health-check endpoint
-* list inventory items
-* retrieve one item
-* create an item
-* update an item
-* delete an item
-* search items
-* retrieve low-stock items
+* run PostgreSQL as a Docker Compose service
+* connect the HIT API through service-to-service networking
+* preserve data in a named volume
+* add PostgreSQL health checks
+* initialize the schema in a clean environment
+* verify repeat startup without data loss
+* keep secrets outside images and Git
+* preserve separation between development and test databases
 
-Pydantic models will define API request and response structures.
+Dockerization should not change PostgreSQL’s role as the source of truth or move SQL out of the repository.
 
 ## Possible Future Database Evolution
 
@@ -792,7 +973,7 @@ Sensitive household actions may eventually require:
 
 ### Search evolution
 
-The current `ILIKE` search is appropriate for v0.2.0.
+The current `ILIKE` search remains appropriate for the current dataset.
 
 Later stages may explore:
 
@@ -821,19 +1002,18 @@ Possible later choice:
 Alembic
 ```
 
-This should be introduced when schema evolution across environments becomes more complex, likely alongside or after the FastAPI stage.
+This should be introduced when schema evolution across environments becomes more complex, not merely because the API now exists.
 
 ### Docker Compose
 
-A later development environment may define:
+The next development environment is expected to define:
 
-* application service
+* HIT API service
 * PostgreSQL service
 * environment configuration
 * persistent database volume
 * health checks
-
-This will make local setup more reproducible.
+* reproducible startup
 
 ### Azure deployment
 
@@ -894,6 +1074,9 @@ The HIT database should evolve according to these principles:
 10. New abstractions must earn their place.
 11. Security and privacy are foundational concerns.
 12. Every iteration must leave the system understandable and testable.
+13. Interfaces reuse repository operations instead of duplicating SQL.
+14. Public API errors must not expose internal database details.
+15. Database schema changes require deliberate migration planning.
 
 ## v0.2.0 Database Milestone
 
@@ -913,4 +1096,21 @@ HIT v0.2.0 established:
 * guarded JSON migration
 * removal of the old JSON runtime
 
-This database foundation is the launch platform for the FastAPI stage and the longer-term evolution of HIT into a secure household intelligence platform.
+## v0.3.0 Database and API Integration Milestone
+
+HIT v0.3.0 established:
+
+* reuse of the existing PostgreSQL schema by FastAPI
+* shared repository and database layers across two interfaces
+* Pydantic validation before repository operations
+* an API-facing application service layer
+* partial-update merging outside the repository
+* safe translation of missing items into `404`
+* safe translation of database outages into `503`
+* server-side logging of Psycopg operational failures
+* isolated API tests that do not require PostgreSQL
+* preservation of real PostgreSQL integration tests against `hit_test`
+
+No schema migration was required for v0.3.0.
+
+The database foundation now supports both console and HTTP interfaces and is ready for the next stage: reproducible Dockerized local development.
