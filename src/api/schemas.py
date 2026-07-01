@@ -15,9 +15,9 @@ class ItemCreate(BaseModel):
 
     name: str = Field(min_length=1, max_length=100)
     category: str = Field(min_length=1, max_length=100)
+    location: str = Field(min_length=1, max_length=100)
     quantity: int = Field(ge=0)
     minimum_quantity: int = Field(ge=0)
-    location: str = Field(min_length=1, max_length=100)
     notes: str | None = Field(default=None, max_length=1000)
 
 
@@ -32,13 +32,13 @@ class ItemUpdate(BaseModel):
         min_length=1,
         max_length=100,
     )
-    quantity: int | None = Field(default=None, ge=0)
-    minimum_quantity: int | None = Field(default=None, ge=0)
     location: str | None = Field(
         default=None,
         min_length=1,
         max_length=100,
     )
+    quantity: int | None = Field(default=None, ge=0)
+    minimum_quantity: int | None = Field(default=None, ge=0)
     notes: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="after")
@@ -50,9 +50,9 @@ class ItemUpdate(BaseModel):
         required_fields = {
             "name",
             "category",
+            "location",
             "quantity",
             "minimum_quantity",
-            "location",
         }
 
         null_required_fields = required_fields.intersection(
@@ -74,7 +74,7 @@ class ItemResponse(BaseModel):
     id: int
     name: str
     category: str
+    location: str
     quantity: int
     minimum_quantity: int
-    location: str
     notes: str | None = None
