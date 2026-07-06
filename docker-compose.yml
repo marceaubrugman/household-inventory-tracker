@@ -1,0 +1,8 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hit-api:v0.4-dev
+    ports:
+      - "8000:8000"
