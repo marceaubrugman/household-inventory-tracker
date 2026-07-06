@@ -6,6 +6,10 @@ services:
     image: hit-api:v0.4-dev
     ports:
       - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://hit_user:hit_password@db:5432/hit
+    depends_on:
+      - db
 
   db:
     image: postgres:18
