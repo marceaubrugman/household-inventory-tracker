@@ -14,7 +14,7 @@ The project is developed incrementally. Each release should:
 
 ## Current Status
 
-**Current release candidate: v0.3.0**
+**Current release candidate: v0.4.0**
 
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
@@ -28,14 +28,18 @@ The current implementation includes:
 * validated FastAPI request and response models
 * secure parameterized SQL
 * PostgreSQL constraints
-* application, repository, and database layers
+* application, service, repository, and database layers
 * controlled API error handling
 * JSON migration tooling
+* Dockerized local development for the FastAPI application and PostgreSQL
+* `.env.example` for local Docker configuration
 * unit, API, service, migration, and PostgreSQL integration tests
 
 PostgreSQL remains the application’s source of truth.
 
 The JSON runtime used in v0.1.0 has been removed. JSON remains supported only as a migration source.
+
+Docker Compose is now available for local development. It starts the FastAPI API service and a PostgreSQL 18 database service together.
 
 ## Current Architecture
 
@@ -71,7 +75,25 @@ database.py
 PostgreSQL
 ```
 
-FastAPI does not connect directly to PostgreSQL. API requests pass through Python application, repository, and database layers.
+### Docker local development path
+
+```text
+docker compose
+   ↓
+api service
+   ↓
+FastAPI / Uvicorn
+   ↓
+database.py
+   ↓
+db service
+   ↓
+PostgreSQL 18
+```
+
+FastAPI does not connect directly to PostgreSQL. API requests pass through Python application, service, repository, and database layers.
+
+Inside Docker Compose, the API connects to PostgreSQL using the Compose service name `db`.
 
 ---
 
@@ -403,32 +425,142 @@ FastAPI does not connect directly to PostgreSQL. API requests pass through Pytho
 * [x] Document local Uvicorn startup
 * [x] Document API testing commands
 * [x] Update backlog for v0.3.0
-* [ ] Update `DATABASE_PLAN.md` where useful
+* [x] Review `DATABASE_PLAN.md`
+* [x] Run `git diff --check`
+* [x] Check tracked files for credentials and private data
+* [x] Run the complete normal test suite
+* [x] Run PostgreSQL integration tests with `TEST_DATABASE_URL`
+* [x] Perform final API CRUD smoke test
+* [x] Perform final console regression test
+* [x] Commit release documentation
+* [x] Push the FastAPI feature branch
+* [x] Merge the feature branch into `main`
+* [x] Run the complete test suite on `main`
+* [x] Create and push annotated Git tag `v0.3.0`
+* [x] Publish GitHub Release `v0.3.0`
+
+---
+
+## v0.4.0: Dockerized Local Development
+
+### Docker foundation
+
+* [x] Create a Docker feature branch
+* [x] Add a `Dockerfile` for the FastAPI application
+* [x] Select a Python base image
+* [x] Install application dependencies inside the image
+* [x] Add `.dockerignore`
+* [x] Keep `.env` outside the image
+* [x] Build the FastAPI application image
+* [x] Run `GET /health` from the container
+* [x] Preserve the existing FastAPI application behavior
+
+### Docker Compose foundation
+
+* [x] Add `docker-compose.yml`
+* [x] Add an `api` service
+* [x] Build the API image through Docker Compose
+* [x] Expose the API development port
+* [x] Start the API with `docker compose up --build`
+* [x] Start the API in detached mode
+* [x] Verify `GET /health`
+* [x] Stop the API with `docker compose down`
+
+### PostgreSQL Compose service
+
+* [x] Add a PostgreSQL service named `db`
+* [x] Use PostgreSQL 18
+* [x] Configure local development database name, user, and password
+* [x] Add a persistent named PostgreSQL volume
+* [x] Use the PostgreSQL 18 Docker volume layout
+* [x] Verify PostgreSQL starts inside Docker Compose
+* [x] Verify direct `psql` access inside the database container
+* [x] Verify current database and current user
+* [x] Preserve existing local PostgreSQL and integration-test behaviour outside Docker Compose
+
+### API-to-database connectivity
+
+* [x] Add `DATABASE_URL` to the API service environment
+* [x] Configure the API to use the Compose service name `db`
+* [x] Preserve the existing `src.database` public interface
+* [x] Preserve `DatabaseConfigurationError`
+* [x] Preserve `get_connection`
+* [x] Add a database connectivity helper
+* [x] Add `GET /db-health`
+* [x] Verify `GET /db-health` from the host machine
+* [x] Verify the API container can connect to the PostgreSQL container
+* [x] Keep `GET /health` independent from PostgreSQL
+
+### Environment configuration
+
+* [x] Add `.env.example`
+* [x] Add local `.env` support
+* [x] Keep `.env` ignored by Git
+* [x] Use Compose variable interpolation
+* [x] Move local Docker database settings out of `docker-compose.yml`
+* [x] Verify resolved configuration with `docker compose config`
+* [x] Keep real credentials and private configuration outside Git
+
+### Testing and verification
+
+* [x] Run existing pytest suite after Docker changes
+* [x] Run Docker image build smoke test
+* [x] Run Docker Compose startup smoke test
+* [x] Verify `GET /health`
+* [x] Verify `GET /db-health`
+* [x] Verify direct PostgreSQL access through `docker compose exec db psql`
+* [x] Verify clean shutdown with `docker compose down`
+* [x] Verify `.env` is not tracked
+* [x] Push Docker feature branch to GitHub for backup
+
+### Documentation and release preparation
+
+* [x] Update README for v0.4.0
+* [x] Document Docker local development workflow
+* [x] Document `.env.example` and local `.env` setup
+* [x] Document Docker Compose startup commands
+* [x] Document `/health` and `/db-health` smoke tests
+* [x] Document direct PostgreSQL access through Docker Compose
+* [x] Document `docker compose down`
+* [x] Warn about `docker compose down -v`
+* [x] Update backlog for v0.4.0
+* [ ] Review `DATABASE_PLAN.md` and update only if outdated
+* [ ] Confirm documented project structure matches the repository
 * [ ] Run `git diff --check`
 * [ ] Check tracked files for credentials and private data
-* [ ] Run the complete normal test suite
-* [ ] Run PostgreSQL integration tests with `TEST_DATABASE_URL`
-* [ ] Perform final API CRUD smoke test
-* [ ] Perform final console regression test
+* [ ] Run `python -m pip check`
+* [ ] Run `python -m compileall src`
+* [ ] Run tests without `TEST_DATABASE_URL`
+* [ ] Run tests with the isolated `hit_test` database
+* [ ] Run final Docker Compose smoke test
+* [ ] Run final API smoke test
+* [ ] Run final console regression test
 * [ ] Commit release documentation
-* [ ] Push the FastAPI feature branch
+* [ ] Push the Docker feature branch
+* [ ] Open and review the pull request
 * [ ] Merge the feature branch into `main`
-* [ ] Run the complete test suite on `main`
-* [ ] Create and push annotated Git tag `v0.3.0`
-* [ ] Publish GitHub Release `v0.3.0`
+* [ ] Rerun all tests on `main`
+* [ ] Create and push annotated Git tag `v0.4.0`
+* [ ] Publish GitHub Release `v0.4.0`
+* [ ] Verify that credentials and private data are absent from GitHub
 
 ---
 
 # Current Priority
 
-## Complete and publish v0.3.0
+## Complete and publish v0.4.0
 
 Before beginning new feature development:
 
-* [x] freeze the v0.3.0 feature set
-* [x] complete FastAPI CRUD
-* [x] complete API and service tests
-* [x] complete safe database error handling
+* [x] freeze the v0.4.0 feature set
+* [x] add Dockerfile
+* [x] add `.dockerignore`
+* [x] add Docker Compose for the API service
+* [x] add PostgreSQL service to Docker Compose
+* [x] connect FastAPI to Compose PostgreSQL
+* [x] move Docker configuration into `.env` and `.env.example`
+* [x] verify `GET /health`
+* [x] verify `GET /db-health`
 * [x] update `README.md`
 * [x] update `BACKLOG.md`
 * [ ] review `DATABASE_PLAN.md`
@@ -439,14 +571,15 @@ Before beginning new feature development:
 * [ ] run `python -m compileall src`
 * [ ] run tests without `TEST_DATABASE_URL`
 * [ ] run tests with the isolated `hit_test` database
-* [ ] run the final API CRUD smoke test
+* [ ] run the final Docker Compose smoke test
+* [ ] run the final API smoke test
 * [ ] run the final console regression test
 * [ ] commit release documentation
 * [ ] push the feature branch
 * [ ] open and review the pull request
 * [ ] merge into `main`
 * [ ] rerun all tests on `main`
-* [ ] create and push `v0.3.0`
+* [ ] create and push `v0.4.0`
 * [ ] publish the GitHub Release
 * [ ] verify that credentials and private data are absent from GitHub
 
@@ -456,60 +589,54 @@ No new feature development should begin until the release is complete.
 
 # Next Major Milestone
 
-## v0.4.0: Dockerized Local Development
+## v0.5.0: Continuous Integration
 
 ### Goal
 
-Create a reproducible local environment in which the Python application and PostgreSQL can be started together without relying on a manually configured local database setup.
+Add automated checks so that tests can run through GitHub Actions when code is pushed or a pull request is opened.
 
-### Docker foundation
+This milestone introduces CI/CD concepts gradually, starting with continuous integration only.
 
-* [ ] Add a Dockerfile for the Python application
-* [ ] Select an appropriate Python base image
-* [ ] Install application dependencies inside the image
-* [ ] Use a non-root application user where practical
-* [ ] Add a `.dockerignore`
-* [ ] Keep secrets outside the image
-* [ ] Document image build commands
+### GitHub Actions foundation
 
-### Docker Compose
+* [ ] Add a GitHub Actions workflow
+* [ ] Run the workflow on pull requests
+* [ ] Run the workflow on pushes to `main`
+* [ ] Install Python
+* [ ] Install project dependencies
+* [ ] Run unit and service tests
+* [ ] Run API tests
+* [ ] Report pass/fail status in GitHub
+* [ ] Keep the workflow small and understandable
 
-* [ ] Add Docker Compose configuration
-* [ ] Add the PostgreSQL service
-* [ ] Add the HIT API service
-* [ ] Configure service-to-service database networking
-* [ ] Add a persistent PostgreSQL volume
-* [ ] Add PostgreSQL health check
-* [ ] Add application health check
-* [ ] Start the API only after PostgreSQL is healthy
-* [ ] Expose the API development port
-* [ ] Document required environment variables
+### Later CI improvements
 
-### Database initialization
-
-* [ ] Apply `sql/schema.sql` in a clean environment
-* [ ] Decide how schema initialization is triggered
-* [ ] Verify first-run database creation
-* [ ] Verify repeat startup without data loss
-* [ ] Preserve the existing migration tooling
-* [ ] Keep the development and test databases separate
-
-### Testing and verification
-
-* [ ] Build the application image from a clean checkout
-* [ ] Start HIT and PostgreSQL with one Compose command
-* [ ] Verify `GET /health`
-* [ ] Verify PostgreSQL-backed CRUD
-* [ ] Verify persistent data after container restart
-* [ ] Verify clean shutdown
-* [ ] Verify failed database startup behavior
-* [ ] Run the existing automated test suite
-* [ ] Update README and architecture documentation
-* [ ] Publish Git tag `v0.4.0`
+* [ ] Add dependency checks
+* [ ] Run `python -m pip check`
+* [ ] Run `python -m compileall src`
+* [ ] Add linting when a linting standard is chosen
+* [ ] Add a PostgreSQL test service
+* [ ] Run integration tests in CI
+* [ ] Build the Docker image in CI
+* [ ] Block merging when checks fail
 
 ---
 
 # Later Technical Milestones
+
+## Docker improvements
+
+* [ ] Add PostgreSQL health check
+* [ ] Add application health check
+* [ ] Start the API only after PostgreSQL is healthy
+* [ ] Apply `sql/schema.sql` automatically in a clean Docker environment
+* [ ] Decide how schema initialization is triggered
+* [ ] Verify first-run database creation
+* [ ] Verify repeat startup without data loss
+* [ ] Verify persistent data after container restart
+* [ ] Verify failed database startup behavior
+* [ ] Consider a non-root application user in the Docker image
+* [ ] Document image build commands separately if needed
 
 ## API query capabilities
 
@@ -527,17 +654,6 @@ Create a reproducible local environment in which the Python application and Post
 * [ ] Create a baseline migration
 * [ ] Test schema upgrades
 * [ ] Document migration commands
-
-## Continuous integration
-
-* [ ] Add a GitHub Actions workflow
-* [ ] Install dependencies
-* [ ] Run unit and service tests
-* [ ] Run API tests
-* [ ] Start a PostgreSQL test service
-* [ ] Run integration tests
-* [ ] Run dependency checks
-* [ ] Block merging when checks fail
 
 ## Frontend foundation
 
@@ -615,16 +731,21 @@ Create a reproducible local environment in which the Python application and Post
 15. Interfaces should share application rules rather than duplicate them.
 16. Public API errors must not expose internal infrastructure details.
 17. Feature breadth should not outrun architectural understanding.
+18. Local development should be reproducible without hidden manual setup where practical.
+19. CI/CD should be added incrementally and only after the local workflow is stable.
+20. Docker is used to make development repeatable, not to hide architectural confusion.
 
 ---
 
 # Immediate Next Action
 
-Complete the v0.3.0 release checklist:
+Complete the v0.4.0 release checklist:
 
 1. review `DATABASE_PLAN.md`
-2. run final documentation, dependency, and test checks
-3. perform the API and console smoke tests
-4. commit and push the release documentation
-5. merge the FastAPI feature branch into `main`
-6. tag and publish `v0.3.0`
+2. check whether `menu.py` or `src/api/main.py` still expose `v0.3.0`
+3. run final documentation, dependency, and test checks
+4. perform the Docker Compose, API, and console smoke tests
+5. commit and push the release documentation
+6. open and review the pull request
+7. merge the Docker feature branch into `main`
+8. tag and publish `v0.4.0`
