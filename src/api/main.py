@@ -7,7 +7,7 @@ from src.database import check_database_connection
 
 app = FastAPI(
     title="Household Inventory Tracker API",
-    version="0.3.0",
+    version="0.4.0",
 )
 
 register_exception_handlers(app)

@@ -8,6 +8,7 @@ It records:
 
 * the PostgreSQL implementation introduced in v0.2.0
 * how the FastAPI interface added in v0.3.0 reuses the same database foundation
+* how Dockerized local development added in v0.4.0 runs PostgreSQL through Docker Compose
 * the responsibilities of the database, repository, service, and interface layers
 * current security and integrity decisions
 * the migration path from JSON
@@ -17,13 +18,20 @@ The current database model is intentionally simple. Its purpose is to provide a 
 
 ## Current Status
 
-**Implemented through HIT v0.3.0**
+**Implemented through HIT v0.4.0**
 
 PostgreSQL is the primary source of truth for inventory data.
 
 The previous JSON runtime storage has been removed from the application. JSON remains supported only as a legacy migration source.
 
-No database schema migration was required for v0.3.0. The FastAPI interface reuses the same PostgreSQL schema and repository layer introduced in v0.2.0.
+No database schema migration was required for v0.4.0. The Dockerized local development setup reuses the same PostgreSQL schema and repository layer introduced in v0.2.0.
+
+HIT can now run PostgreSQL in two local development modes:
+
+* manually managed PostgreSQL using a local `DATABASE_URL`
+* Docker Compose PostgreSQL using the `db` service and local `.env` configuration
+
+Docker Compose is intended for reproducible local development. It does not change PostgreSQL’s role as the source of truth and does not move SQL out of the repository layer.
 
 ## Current Persistence Architecture
 
@@ -59,13 +67,47 @@ database.py
 PostgreSQL
 ```
 
+### Docker local development path
+
+```text
+docker compose
+   ↓
+api service
+   ↓
+FastAPI / Uvicorn
+   ↓
+API routers and dependencies
+   ↓
+item_service.py
+   ↓
+item_repository.py
+   ↓
+database.py
+   ↓
+db service
+   ↓
+PostgreSQL 18
+```
+
 The console and FastAPI interfaces use the same PostgreSQL schema, repository functions, and connection layer.
 
 FastAPI does not connect directly to PostgreSQL. API requests pass through Python application, repository, and database layers.
 
+Inside Docker Compose, the API connects to PostgreSQL using the Compose service name:
+
+```text
+db
+```
+
+The Docker Compose database connection string is provided through `.env` as:
+
+```text
+DATABASE_URL=postgresql://hit_user:hit_password@db:5432/hit
+```
+
 ## Database Environments
 
-### Development database
+### Manual development database
 
 ```text
 hit_db
@@ -73,8 +115,8 @@ hit_db
 
 Used by:
 
-* the console application
-* the FastAPI application
+* the console application when run manually
+* the FastAPI application when run manually with Uvicorn
 * database connection diagnostics
 * manual development and smoke testing
 
@@ -83,6 +125,45 @@ The connection string is read from:
 ```text
 DATABASE_URL
 ```
+
+Example manual local format:
+
+```text
+postgresql://USERNAME:PASSWORD@localhost:5432/hit_db
+```
+
+### Docker Compose development database
+
+```text
+hit
+```
+
+Used by:
+
+* the FastAPI application running inside the Docker Compose `api` service
+* PostgreSQL running inside the Docker Compose `db` service
+* Docker Compose smoke testing
+* the `/db-health` endpoint
+
+The Docker Compose connection string is defined in `.env`:
+
+```text
+DATABASE_URL=postgresql://hit_user:hit_password@db:5432/hit
+```
+
+Inside Docker Compose, the hostname is:
+
+```text
+db
+```
+
+not:
+
+```text
+localhost
+```
+
+The Docker Compose PostgreSQL data is persisted in a named Docker volume.
 
 ### Integration-test database
 
@@ -98,7 +179,7 @@ The connection string is read from:
 TEST_DATABASE_URL
 ```
 
-The development and test databases must remain separate.
+The development, Docker Compose, and test databases must remain separate.
 
 ## PostgreSQL Schema
 
@@ -537,7 +618,7 @@ Pydantic validation improves the HTTP client experience, but PostgreSQL constrai
 
 ### Credentials
 
-Database credentials are not stored in source code.
+Database credentials are not stored directly in Python source code.
 
 The application reads:
 
@@ -551,7 +632,14 @@ Integration tests read:
 TEST_DATABASE_URL
 ```
 
-Real connection strings remain in local environment variables or PyCharm run configurations and are excluded from Git.
+For Docker Compose local development:
+
+* `.env.example` is committed as a safe configuration template
+* `.env` contains local development values
+* `.env` is ignored by Git
+* `.env` is not copied into the Docker image
+
+Real connection strings remain in local environment variables, local `.env` files, or PyCharm run configurations and are excluded from Git.
 
 ### Connection timeout
 
@@ -735,6 +823,7 @@ These tests use fakes and pytest monkeypatching.
 FastAPI endpoint tests cover:
 
 * health checks
+* database health checks
 * list retrieval
 * single-item retrieval
 * creation
@@ -745,7 +834,20 @@ FastAPI endpoint tests cover:
 * missing database configuration
 * PostgreSQL operational failures
 
-FastAPI dependency overrides and monkeypatching keep these tests isolated from PostgreSQL.
+FastAPI dependency overrides and monkeypatching keep most API tests isolated from PostgreSQL.
+
+## Docker Compose smoke tests
+
+Docker Compose smoke tests verify:
+
+* the API container starts
+* the PostgreSQL container starts
+* `/health` responds successfully
+* `/db-health` confirms API-to-database connectivity
+* direct PostgreSQL access works through `docker compose exec db psql`
+* the stack stops cleanly with `docker compose down`
+
+These checks are manual for v0.4.0. They may become automated later through continuous integration.
 
 ## PostgreSQL integration tests
 
@@ -843,6 +945,30 @@ The API adds `item_service.py` above the repository for application operations s
 
 The console currently retains `inventory_workflows.py` as its coordination layer.
 
+### Docker Compose for local development
+
+HIT v0.4.0 introduced Docker Compose for local development.
+
+The current Compose setup defines:
+
+* HIT API service
+* PostgreSQL 18 service
+* environment configuration through `.env`
+* persistent database volume
+* service-to-service database networking
+* `/health` API liveness check
+* `/db-health` API-to-database connectivity check
+
+The Docker Compose setup is intended for local development. It is not a production deployment model.
+
+Future Docker database improvements may include:
+
+* PostgreSQL health checks
+* application health checks
+* startup ordering based on database readiness
+* automatic schema initialization in a clean Docker environment
+* clearer reset and seed workflows for local development
+
 ## Current Limitations
 
 The current database model does not yet support:
@@ -871,24 +997,30 @@ The API also does not yet expose:
 * low-stock retrieval
 * pagination
 
-These are future capabilities, not unfinished v0.3.0 work.
+The Docker local development setup also does not yet include:
+
+* database health checks
+* startup ordering based on PostgreSQL readiness
+* automatic first-run schema initialization
+* automated seed data
+* automated Docker-based test execution
+
+These are future capabilities, not unfinished v0.4.0 work.
 
 ## Next Major Stage
 
-The next major development stage is Dockerized local development.
+The next major development stage is continuous integration.
 
-The database goals for that stage are:
+The database-related goals for that stage are:
 
-* run PostgreSQL as a Docker Compose service
-* connect the HIT API through service-to-service networking
-* preserve data in a named volume
-* add PostgreSQL health checks
-* initialize the schema in a clean environment
-* verify repeat startup without data loss
-* keep secrets outside images and Git
-* preserve separation between development and test databases
+* run automated tests through GitHub Actions
+* keep fast tests independent from PostgreSQL
+* decide when and how PostgreSQL integration tests should run in CI
+* eventually add a PostgreSQL service for integration testing in CI
+* preserve separation between development, Docker Compose, and test databases
+* prevent unsafe cleanup against non-test databases
 
-Dockerization should not change PostgreSQL’s role as the source of truth or move SQL out of the repository.
+Continuous integration should not change PostgreSQL’s role as the source of truth or move SQL out of the repository.
 
 ## Possible Future Database Evolution
 
@@ -1002,18 +1134,20 @@ Possible later choice:
 Alembic
 ```
 
-This should be introduced when schema evolution across environments becomes more complex, not merely because the API now exists.
+This should be introduced when schema evolution across environments becomes more complex, not merely because the API exists.
 
-### Docker Compose
+### Continuous integration
 
-The next development environment is expected to define:
+A later CI setup may define:
 
-* HIT API service
-* PostgreSQL service
-* environment configuration
-* persistent database volume
-* health checks
-* reproducible startup
+* Python dependency installation
+* fast unit and API tests
+* PostgreSQL service for integration tests
+* safe test database setup
+* Docker image build checks
+* automated feedback on pull requests
+
+CI should be added incrementally and should not replace local testing discipline.
 
 ### Azure deployment
 
@@ -1077,6 +1211,8 @@ The HIT database should evolve according to these principles:
 13. Interfaces reuse repository operations instead of duplicating SQL.
 14. Public API errors must not expose internal database details.
 15. Database schema changes require deliberate migration planning.
+16. Dockerized development should make local setup more reproducible without hiding database behavior.
+17. CI should automate confidence checks without weakening local development discipline.
 
 ## v0.2.0 Database Milestone
 
@@ -1113,4 +1249,25 @@ HIT v0.3.0 established:
 
 No schema migration was required for v0.3.0.
 
-The database foundation now supports both console and HTTP interfaces and is ready for the next stage: reproducible Dockerized local development.
+The database foundation now supports both console and HTTP interfaces.
+
+## v0.4.0 Dockerized Local Development Milestone
+
+HIT v0.4.0 established:
+
+* Dockerized local development for the FastAPI application
+* a Docker Compose `api` service
+* a Docker Compose PostgreSQL `db` service
+* PostgreSQL 18 for the Docker Compose database
+* a named Docker volume for local PostgreSQL persistence
+* service-to-service database networking through the hostname `db`
+* local Docker configuration through `.env`
+* safe example configuration through `.env.example`
+* preservation of the existing `DATABASE_URL`-based database layer
+* preservation of the existing repository and integration-test behavior
+* a `/db-health` endpoint to verify API-to-database connectivity
+* documentation for Docker Compose startup, shutdown, and smoke testing
+
+No database schema migration was required for v0.4.0.
+
+The database foundation now supports both manual local development and Dockerized local development. Future database work can focus on schema evolution, migrations, indexing, users, households, audit history, CI integration, and production deployment.
