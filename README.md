@@ -749,16 +749,24 @@ HIT includes unit tests, API endpoint tests, service tests, migration tests, and
 
 ### Continuous integration
 
-GitHub Actions runs the non-integration Python test suite automatically on every push and pull request. The workflow is defined in `.github/workflows/python-ci.yml`.
+GitHub Actions runs two automated test jobs on every push and pull request. The workflow is defined in `.github/workflows/python-ci.yml`.
 
-The workflow:
+The `non-integration-tests` job:
 
 * runs on Ubuntu
 * installs Python 3.14
 * installs dependencies from `requirements.txt`
 * runs `python -m pytest -m "not integration" -v`
 
-PostgreSQL integration tests are intentionally excluded from the current CI workflow and continue to run locally against the isolated `hit_test` database.
+The `postgresql-integration-tests` job:
+
+* starts a temporary PostgreSQL 18 service
+* creates the isolated `hit_test` database
+* applies `sql/schema.sql`
+* configures `TEST_DATABASE_URL`
+* runs `python -m pytest -m integration -v`
+
+The PostgreSQL integration-test fixture verifies that the connected database name ends with `_test` before cleaning test data.
 
 ### Tests that do not require PostgreSQL
 
