@@ -345,6 +345,9 @@ Application validation improves the user experience, while PostgreSQL constraint
 
 ```text
 household-inventory-tracker/
+├── .github/
+│   └── workflows/
+│       └── python-ci.yml
 ├── .dockerignore
 ├── .env.example
 ├── app.py
@@ -413,6 +416,7 @@ household-inventory-tracker/
 * Docker Desktop
 * pgAdmin 4
 * Git and GitHub
+* GitHub Actions
 
 ## Requirements
 
@@ -743,6 +747,19 @@ These checks verify that:
 
 HIT includes unit tests, API endpoint tests, service tests, migration tests, and PostgreSQL integration tests.
 
+### Continuous integration
+
+GitHub Actions runs the non-integration Python test suite automatically on every push and pull request. The workflow is defined in `.github/workflows/python-ci.yml`.
+
+The workflow:
+
+* runs on Ubuntu
+* installs Python 3.14
+* installs dependencies from `requirements.txt`
+* runs `python -m pytest -m "not integration" -v`
+
+PostgreSQL integration tests are intentionally excluded from the current CI workflow and continue to run locally against the isolated `hit_test` database.
+
 ### Tests that do not require PostgreSQL
 
 Run:
@@ -878,7 +895,6 @@ These limitations define later iterations rather than unfinished v0.4.0 work.
 
 Planned future work includes:
 
-* GitHub Actions CI for automated test checks
 * API search and low-stock query support
 * pagination
 * structured application logging
