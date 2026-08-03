@@ -749,7 +749,7 @@ HIT includes unit tests, API endpoint tests, service tests, migration tests, and
 
 ### Continuous integration
 
-GitHub Actions runs two automated test jobs on every push and pull request. The workflow is defined in `.github/workflows/python-ci.yml`.
+GitHub Actions runs three automated CI jobs on every push and pull request. The workflow is defined in `.github/workflows/python-ci.yml`.
 
 The `non-integration-tests` job:
 
@@ -765,6 +765,15 @@ The `postgresql-integration-tests` job:
 * applies `sql/schema.sql`
 * configures `TEST_DATABASE_URL`
 * runs `python -m pytest -m integration -v`
+
+The `docker-build` job:
+
+* runs on Ubuntu
+* builds the API image from the committed `Dockerfile`
+* tags the temporary image as `hit-api:ci-check`
+* verifies that the image can be assembled on a clean GitHub runner
+
+The Docker image is built for validation only. It is not started, published, or deployed.
 
 The PostgreSQL integration-test fixture verifies that the connected database name ends with `_test` before cleaning test data.
 
