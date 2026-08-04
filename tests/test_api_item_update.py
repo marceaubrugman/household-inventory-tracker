@@ -29,6 +29,7 @@ def test_update_item_returns_updated_item(
             "quantity": 8,
             "minimum_quantity": 1,
             "location": "Pantry",
+            "tracking_mode": "quantity",
             "notes": "Basmati",
         }
 
@@ -49,7 +50,7 @@ def test_update_item_returns_updated_item(
         "updates": {"quantity": 8},
     }
     assert response.json()["quantity"] == 8
-
+    assert response.json()["tracking_mode"] == "quantity"
 
 def test_update_item_returns_404_when_missing(
     monkeypatch,
@@ -126,6 +127,7 @@ def test_update_item_allows_notes_to_be_cleared(
             "quantity": 3,
             "minimum_quantity": 1,
             "location": "Pantry",
+            "tracking_mode": "quantity",
             "notes": None,
         }
 

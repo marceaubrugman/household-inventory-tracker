@@ -20,6 +20,7 @@ def fake_existing_item(item_id: int) -> dict[str, Any]:
         "quantity": 4,
         "minimum_quantity": 2,
         "location": "Pantry",
+        "tracking_mode": "quantity",
         "notes": "Whole wheat",
         "created_at": "2026-06-29T08:00:00+00:00",
         "updated_at": "2026-06-29T08:00:00+00:00",
@@ -49,6 +50,7 @@ def test_get_item_returns_inventory_item() -> None:
         "quantity": 4,
         "minimum_quantity": 2,
         "location": "Pantry",
+        "tracking_mode": "quantity",
         "notes": "Whole wheat",
     }
 

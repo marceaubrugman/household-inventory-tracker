@@ -23,6 +23,7 @@ def test_create_item_returns_201_and_created_item(
         return {
             "id": 12,
             **item_data,
+            "tracking_mode": "quantity",
             "created_at": "2026-06-30T10:00:00+00:00",
             "updated_at": "2026-06-30T10:00:00+00:00",
         }
@@ -49,6 +50,7 @@ def test_create_item_returns_201_and_created_item(
     assert response.json() == {
         "id": 12,
         **payload,
+        "tracking_mode": "quantity",
     }
 
 

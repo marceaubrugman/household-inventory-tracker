@@ -30,6 +30,8 @@ def test_create_get_update_and_delete_item():
     assert isinstance(created_item["id"], int)
     assert created_item["name"] == "Coffee filters"
 
+    assert created_item["tracking_mode"] == "quantity"
+
     retrieved_item = get_item_by_id(created_item["id"])
 
     assert retrieved_item == created_item

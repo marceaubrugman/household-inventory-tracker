@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import (
     BaseModel,
@@ -75,6 +75,7 @@ class ItemResponse(BaseModel):
     name: str
     category: str
     location: str
+    tracking_mode: Literal["quantity", "individual"]
     quantity: int
     minimum_quantity: int
     notes: str | None = None

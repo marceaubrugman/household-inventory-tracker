@@ -56,6 +56,7 @@ def create_item(
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes;
@@ -92,6 +93,7 @@ def get_all_items(sort_key="name"):
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes
@@ -116,6 +118,7 @@ def get_item_by_id(item_id):
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes
@@ -145,6 +148,7 @@ def search_items(search_term):
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes
@@ -188,6 +192,7 @@ def update_item(
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes;
@@ -219,6 +224,7 @@ def delete_item(item_id):
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes;
@@ -241,6 +247,7 @@ def get_low_stock_items(sort_key="name"):
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes
