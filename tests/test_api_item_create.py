@@ -1,3 +1,5 @@
+import pytest
+
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -23,7 +25,6 @@ def test_create_item_returns_201_and_created_item(
         return {
             "id": 12,
             **item_data,
-            "tracking_mode": "quantity",
             "created_at": "2026-06-30T10:00:00+00:00",
             "updated_at": "2026-06-30T10:00:00+00:00",
         }
@@ -45,12 +46,16 @@ def test_create_item_returns_201_and_created_item(
 
     response = client.post("/items", json=payload)
 
-    assert response.status_code == 201
-    assert received_data == payload
-    assert response.json() == {
-        "id": 12,
+    expected_item_data = {
         **payload,
         "tracking_mode": "quantity",
+    }
+
+    assert response.status_code == 201
+    assert received_data == expected_item_data
+    assert response.json() == {
+        "id": 12,
+        **expected_item_data,
     }
 
 
@@ -118,6 +123,100 @@ def test_create_item_rejects_blank_name(
             "minimum_quantity": 1,
             "location": "Pantry",
             "notes": None,
+        },
+    )
+
+    assert response.status_code == 422
+    assert service_was_called is False
+
+
+def test_create_individual_item_without_quantities(
+    monkeypatch,
+) -> None:
+    """Verify that individual assets accept null quantity fields."""
+    received_data: dict[str, Any] = {}
+
+    def fake_create_inventory_item(
+        **item_data: Any,
+    ) -> dict[str, Any]:
+        received_data.update(item_data)
+
+        return {
+            "id": 13,
+            **item_data,
+        }
+
+    monkeypatch.setattr(
+        items_router.item_service,
+        "create_inventory_item",
+        fake_create_inventory_item,
+    )
+
+    payload = {
+        "name": "Cordless drill",
+        "category": "Tools",
+        "location": "Garage",
+        "tracking_mode": "individual",
+        "quantity": None,
+        "minimum_quantity": None,
+        "notes": "Blue carrying case",
+    }
+
+    response = client.post("/items", json=payload)
+
+    assert response.status_code == 201
+    assert received_data == payload
+    assert response.json() == {
+        "id": 13,
+        **payload,
+    }
+
+
+@pytest.mark.parametrize(
+    (
+        "tracking_mode",
+        "quantity",
+        "minimum_quantity",
+    ),
+    [
+        ("quantity", None, None),
+        ("quantity", 1, None),
+        ("individual", 1, 0),
+        ("individual", None, 0),
+    ],
+)
+def test_create_item_rejects_quantities_that_do_not_match_mode(
+    monkeypatch,
+    tracking_mode,
+    quantity,
+    minimum_quantity,
+) -> None:
+    """Verify invalid tracking-mode combinations are rejected."""
+    service_was_called = False
+
+    def fake_create_inventory_item(
+        **_item_data: Any,
+    ) -> dict[str, Any]:
+        nonlocal service_was_called
+        service_was_called = True
+        return {}
+
+    monkeypatch.setattr(
+        items_router.item_service,
+        "create_inventory_item",
+        fake_create_inventory_item,
+    )
+
+    response = client.post(
+        "/items",
+        json={
+            "name": "Test item",
+            "category": "Testing",
+            "location": "Laboratory",
+            "tracking_mode": tracking_mode,
+            "quantity": quantity,
+            "minimum_quantity": minimum_quantity,
+            "notes": "",
         },
     )
 

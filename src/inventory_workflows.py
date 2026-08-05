@@ -145,15 +145,19 @@ def update_item():
         )
     )
 
-    quantity = get_optional_non_negative_int(
-        "Quantity",
-        current_item["quantity"],
-    )
+    if current_item["tracking_mode"] == "quantity":
+        quantity = get_optional_non_negative_int(
+            "Quantity",
+            current_item["quantity"],
+        )
 
-    minimum_quantity = get_optional_non_negative_int(
-        "Minimum quantity",
-        current_item["minimum_quantity"],
-    )
+        minimum_quantity = get_optional_non_negative_int(
+            "Minimum quantity",
+            current_item["minimum_quantity"],
+        )
+    else:
+        quantity = None
+        minimum_quantity = None
 
     notes = get_optional_notes(
         "Notes",
@@ -165,6 +169,7 @@ def update_item():
         name=name,
         category=category,
         location=location,
+        tracking_mode=current_item["tracking_mode"],
         quantity=quantity,
         minimum_quantity=minimum_quantity,
         notes=notes,

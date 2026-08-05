@@ -77,6 +77,7 @@ def test_create_inventory_item_forwards_creation_data(
         quantity: int,
         minimum_quantity: int,
         location: str,
+        tracking_mode: str,
         notes: str | None,
     ) -> dict[str, Any]:
         received_data.update(
@@ -86,6 +87,7 @@ def test_create_inventory_item_forwards_creation_data(
                 "quantity": quantity,
                 "minimum_quantity": minimum_quantity,
                 "location": location,
+                "tracking_mode": tracking_mode,
                 "notes": notes,
             }
         )
@@ -116,11 +118,76 @@ def test_create_inventory_item_forwards_creation_data(
         "quantity": 3,
         "minimum_quantity": 1,
         "location": "Pantry",
+        "tracking_mode": "quantity",
         "notes": "Basmati",
     }
 
     assert result == {
         "id": 12,
+        **received_data,
+    }
+
+
+def test_create_individual_item_forwards_tracking_mode(
+    monkeypatch,
+) -> None:
+    """Verify individual creation data reaches the repository."""
+    received_data: dict[str, Any] = {}
+
+    def fake_create_item(
+        *,
+        name: str,
+        category: str,
+        location: str,
+        tracking_mode: str,
+        quantity: int | None,
+        minimum_quantity: int | None,
+        notes: str | None,
+    ) -> dict[str, Any]:
+        received_data.update(
+            {
+                "name": name,
+                "category": category,
+                "location": location,
+                "tracking_mode": tracking_mode,
+                "quantity": quantity,
+                "minimum_quantity": minimum_quantity,
+                "notes": notes,
+            }
+        )
+
+        return {
+            "id": 13,
+            **received_data,
+        }
+
+    monkeypatch.setattr(
+        item_service,
+        "create_item",
+        fake_create_item,
+    )
+
+    result = item_service.create_inventory_item(
+        name="Cordless drill",
+        category="Tools",
+        location="Garage",
+        tracking_mode="individual",
+        quantity=None,
+        minimum_quantity=None,
+        notes="Blue carrying case",
+    )
+
+    assert received_data == {
+        "name": "Cordless drill",
+        "category": "Tools",
+        "location": "Garage",
+        "tracking_mode": "individual",
+        "quantity": None,
+        "minimum_quantity": None,
+        "notes": "Blue carrying case",
+    }
+    assert result == {
+        "id": 13,
         **received_data,
     }
 
@@ -135,6 +202,7 @@ def test_update_inventory_item_merges_partial_changes(
         "id": 7,
         "name": "Rice",
         "category": "Food",
+        "tracking_mode": "quantity",
         "quantity": 3,
         "minimum_quantity": 1,
         "location": "Pantry",
@@ -155,20 +223,22 @@ def test_update_inventory_item_merges_partial_changes(
         return next(lookup_results)
 
     def fake_update_item(
-        *,
-        item_id: int,
-        name: str,
-        category: str,
-        quantity: int,
-        minimum_quantity: int,
-        location: str,
-        notes: str | None,
+            *,
+            item_id: int,
+            name: str,
+            category: str,
+            tracking_mode: str,
+            quantity: int,
+            minimum_quantity: int,
+            location: str,
+            notes: str | None,
     ) -> None:
         repository_updates.update(
             {
                 "item_id": item_id,
                 "name": name,
                 "category": category,
+                "tracking_mode": tracking_mode,
                 "quantity": quantity,
                 "minimum_quantity": minimum_quantity,
                 "location": location,
@@ -200,6 +270,7 @@ def test_update_inventory_item_merges_partial_changes(
         "minimum_quantity": 1,
         "location": "Pantry",
         "notes": "Basmati",
+        "tracking_mode": "quantity",
     }
     assert result == updated_item
 
@@ -302,4 +373,95 @@ def test_delete_inventory_item_does_not_delete_missing_item(
     assert result is False
     assert delete_was_called is False
 
+
+def test_update_inventory_item_switches_tracking_mode(
+    monkeypatch,
+) -> None:
+    """Verify a tracking-mode transition reaches the repository."""
+    current_item = {
+        "id": 7,
+        "name": "Cordless drill",
+        "category": "Tools",
+        "location": "Garage",
+        "tracking_mode": "quantity",
+        "quantity": 1,
+        "minimum_quantity": 0,
+        "notes": "Blue carrying case",
+    }
+    updated_item = {
+        **current_item,
+        "tracking_mode": "individual",
+        "quantity": None,
+        "minimum_quantity": None,
+    }
+
+    lookup_results = iter(
+        [
+            current_item,
+            updated_item,
+        ]
+    )
+    received_data: dict[str, Any] = {}
+
+    def fake_get_item_by_id(
+        item_id: int,
+    ) -> dict[str, Any]:
+        assert item_id == 7
+        return next(lookup_results)
+
+    def fake_update_item(
+        *,
+        item_id: int,
+        name: str,
+        category: str,
+        location: str,
+        tracking_mode: str,
+        quantity: int | None,
+        minimum_quantity: int | None,
+        notes: str | None,
+    ) -> None:
+        received_data.update(
+            {
+                "item_id": item_id,
+                "name": name,
+                "category": category,
+                "location": location,
+                "tracking_mode": tracking_mode,
+                "quantity": quantity,
+                "minimum_quantity": minimum_quantity,
+                "notes": notes,
+            }
+        )
+
+    monkeypatch.setattr(
+        item_service,
+        "get_item_by_id",
+        fake_get_item_by_id,
+    )
+    monkeypatch.setattr(
+        item_service,
+        "update_item",
+        fake_update_item,
+    )
+
+    result = item_service.update_inventory_item(
+        item_id=7,
+        updates={
+            "tracking_mode": "individual",
+            "quantity": None,
+            "minimum_quantity": None,
+        },
+    )
+
+    assert received_data == {
+        "item_id": 7,
+        "name": "Cordless drill",
+        "category": "Tools",
+        "location": "Garage",
+        "tracking_mode": "individual",
+        "quantity": None,
+        "minimum_quantity": None,
+        "notes": "Blue carrying case",
+    }
+    assert result == updated_item
 

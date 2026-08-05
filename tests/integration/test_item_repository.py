@@ -43,6 +43,7 @@ def test_create_get_update_and_delete_item():
         name="Coffee filters",
         category="Food",
         location="Pantry",
+        tracking_mode="quantity",
         quantity=5,
         minimum_quantity=2,
         notes="Size 4 filters",
@@ -193,3 +194,50 @@ def test_individual_item_is_returned_but_not_low_stock():
     }
 
     assert item_id not in low_stock_ids
+
+
+def test_create_individual_item():
+    """Verify the repository creates an individual asset."""
+    created_item = create_item(
+        name="Cordless drill",
+        category="Tools",
+        location="Garage",
+        tracking_mode="individual",
+        quantity=None,
+        minimum_quantity=None,
+        notes="Blue carrying case",
+    )
+
+    assert created_item["name"] == "Cordless drill"
+    assert created_item["tracking_mode"] == "individual"
+    assert created_item["quantity"] is None
+    assert created_item["minimum_quantity"] is None
+
+
+def test_update_item_switches_to_individual_tracking():
+    """Verify the repository can change an item's tracking mode."""
+    created_item = create_item(
+        name="Cordless drill",
+        category="Tools",
+        location="Garage",
+        tracking_mode="quantity",
+        quantity=1,
+        minimum_quantity=0,
+        notes="Blue carrying case",
+    )
+
+    updated_item = update_item(
+        item_id=created_item["id"],
+        name="Cordless drill",
+        category="Tools",
+        location="Garage",
+        tracking_mode="individual",
+        quantity=None,
+        minimum_quantity=None,
+        notes="Blue carrying case",
+    )
+
+    assert updated_item is not None
+    assert updated_item["tracking_mode"] == "individual"
+    assert updated_item["quantity"] is None
+    assert updated_item["minimum_quantity"] is None

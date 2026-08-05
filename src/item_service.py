@@ -23,10 +23,11 @@ def create_inventory_item(
     *,
     name: str,
     category: str,
-    quantity: int,
-    minimum_quantity: int,
+    quantity: int | None,
+    minimum_quantity: int | None,
     location: str,
     notes: str | None,
+    tracking_mode: str = "quantity",
 ) -> dict[str, Any]:
     """Create and return an inventory item."""
     return create_item(
@@ -36,12 +37,14 @@ def create_inventory_item(
         minimum_quantity=minimum_quantity,
         location=location,
         notes=notes,
+        tracking_mode=tracking_mode,
     )
 
 
 UPDATABLE_ITEM_FIELDS = {
     "name",
     "category",
+    "tracking_mode",
     "quantity",
     "minimum_quantity",
     "location",
@@ -76,9 +79,10 @@ def update_inventory_item(
         item_id=item_id,
         name=merged_item["name"],
         category=merged_item["category"],
+        location=merged_item["location"],
+        tracking_mode=merged_item["tracking_mode"],
         quantity=merged_item["quantity"],
         minimum_quantity=merged_item["minimum_quantity"],
-        location=merged_item["location"],
         notes=merged_item["notes"],
     )
 

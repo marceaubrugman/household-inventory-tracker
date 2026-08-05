@@ -39,6 +39,7 @@ def create_item(
     quantity,
     minimum_quantity,
     notes="",
+    tracking_mode="quantity",
 ):
     """Insert an inventory item and return the created row."""
     query = """
@@ -46,11 +47,12 @@ def create_item(
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes
         )
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         RETURNING
             id,
             name,
@@ -66,6 +68,7 @@ def create_item(
         name,
         category,
         location,
+        tracking_mode,
         quantity,
         minimum_quantity,
         notes,
@@ -175,6 +178,7 @@ def update_item(
     quantity,
     minimum_quantity,
     notes,
+    tracking_mode,
 ):
     """Update an inventory item and return the changed row."""
     query = """
@@ -183,6 +187,7 @@ def update_item(
             name = %s,
             category = %s,
             location = %s,
+            tracking_mode = %s,
             quantity = %s,
             minimum_quantity = %s,
             notes = %s
@@ -202,6 +207,7 @@ def update_item(
         name,
         category,
         location,
+        tracking_mode,
         quantity,
         minimum_quantity,
         notes,
