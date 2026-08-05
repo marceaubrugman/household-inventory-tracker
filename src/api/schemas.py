@@ -112,10 +112,20 @@ class ItemUpdate(BaseModel):
                 "minimum_quantity" in self.model_fields_set
         )
 
+        tracking_mode_supplied = (
+            "tracking_mode" in self.model_fields_set
+        )
+        quantity_supplied = (
+            "quantity" in self.model_fields_set
+        )
+        minimum_quantity_supplied = (
+            "minimum_quantity" in self.model_fields_set
+        )
+
         if tracking_mode_supplied:
             if not (
-                    quantity_supplied
-                    and minimum_quantity_supplied
+                quantity_supplied
+                and minimum_quantity_supplied
             ):
                 raise ValueError(
                     "Changing tracking_mode requires quantity "
@@ -124,8 +134,8 @@ class ItemUpdate(BaseModel):
 
             if self.tracking_mode == "quantity":
                 if (
-                        self.quantity is None
-                        or self.minimum_quantity is None
+                    self.quantity is None
+                    or self.minimum_quantity is None
                 ):
                     raise ValueError(
                         "Quantity-tracked items require quantity "
@@ -134,8 +144,8 @@ class ItemUpdate(BaseModel):
 
             if self.tracking_mode == "individual":
                 if (
-                        self.quantity is not None
-                        or self.minimum_quantity is not None
+                    self.quantity is not None
+                    or self.minimum_quantity is not None
                 ):
                     raise ValueError(
                         "Individual items may not have quantity "
