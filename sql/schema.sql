@@ -8,9 +8,23 @@ CREATE TABLE IF NOT EXISTS hit.items (
     tracking_mode VARCHAR(20) NOT NULL DEFAULT 'quantity'
         CONSTRAINT tracking_mode_allowed
         CHECK (tracking_mode IN ('quantity', 'individual')),
-    quantity INTEGER NOT NULL
+    quantity INTEGER
         CONSTRAINT quantity_non_negative CHECK (quantity >= 0),
-    minimum_quantity INTEGER NOT NULL
+    minimum_quantity INTEGER
         CONSTRAINT minimum_quantity_non_negative CHECK (minimum_quantity >= 0),
-    notes TEXT NOT NULL DEFAULT ''
+    notes TEXT NOT NULL DEFAULT '',
+    CONSTRAINT tracking_mode_quantity_fields
+    CHECK (
+        (
+            tracking_mode = 'quantity'
+            AND quantity IS NOT NULL
+            AND minimum_quantity IS NOT NULL
+        )
+        OR
+        (
+            tracking_mode = 'individual'
+            AND quantity IS NULL
+            AND minimum_quantity IS NULL
+        )
+    )
 );

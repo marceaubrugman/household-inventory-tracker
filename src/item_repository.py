@@ -252,7 +252,8 @@ def get_low_stock_items(sort_key="name"):
             minimum_quantity,
             notes
         FROM hit.items
-        WHERE quantity <= minimum_quantity
+        WHERE tracking_mode = 'quantity'
+        AND quantity <= minimum_quantity
         ORDER BY {sort_expression}, id;
         """
     ).format(

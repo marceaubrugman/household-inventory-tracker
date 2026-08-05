@@ -76,6 +76,6 @@ class ItemResponse(BaseModel):
     category: str
     location: str
     tracking_mode: Literal["quantity", "individual"]
-    quantity: int
-    minimum_quantity: int
+    quantity: int | None
+    minimum_quantity: int | None
     notes: str | None = None

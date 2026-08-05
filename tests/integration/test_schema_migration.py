@@ -26,6 +26,13 @@ MIGRATION_PATH = (
 
 CURRENT_SCHEMA_PATH = PROJECT_ROOT / "sql" / "schema.sql"
 
+QUANTITY_RULES_MIGRATION_PATH = (
+    PROJECT_ROOT
+    / "sql"
+    / "migrations"
+    / "002_add_tracking_mode_quantity_rules.sql"
+)
+
 
 def _read_sql(file_path: Path) -> str:
     """Return the SQL stored in a repository file."""
@@ -69,6 +76,9 @@ def test_tracking_mode_migration_upgrades_v0_5_0_schema():
 
     old_schema_sql = _read_sql(V0_5_0_SCHEMA_PATH)
     migration_sql = _read_sql(MIGRATION_PATH)
+    quantity_rules_migration_sql = _read_sql(
+        QUANTITY_RULES_MIGRATION_PATH
+    )
     current_schema_sql = _read_sql(CURRENT_SCHEMA_PATH)
 
     with psycopg.connect(
@@ -110,6 +120,7 @@ def test_tracking_mode_migration_upgrades_v0_5_0_schema():
             old_item_id = old_item[0]
 
             connection.execute(migration_sql)
+            connection.execute(quantity_rules_migration_sql)
 
             migrated_item = connection.execute(
                 """
@@ -161,6 +172,40 @@ def test_tracking_mode_migration_upgrades_v0_5_0_schema():
             ).fetchone()
 
             assert default_mode == ("quantity",)
+
+            individual_item = connection.execute(
+                """
+                INSERT INTO hit.items (
+                    name,
+                    category,
+                    location,
+                    tracking_mode,
+                    quantity,
+                    minimum_quantity,
+                    notes
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING
+                    tracking_mode,
+                    quantity,
+                    minimum_quantity;
+                """,
+                (
+                    "Cordless drill",
+                    "Tools",
+                    "Garage",
+                    "individual",
+                    None,
+                    None,
+                    "",
+                ),
+            ).fetchone()
+
+            assert individual_item == (
+                "individual",
+                None,
+                None,
+            )
 
             with pytest.raises(
                 psycopg.errors.CheckViolation
@@ -215,6 +260,15 @@ def test_tracking_mode_migration_upgrades_v0_5_0_schema():
                         "",
                     ),
                 )
+
+            with pytest.raises(
+                psycopg.errors.DuplicateObject
+            ):
+                connection.execute(
+                    quantity_rules_migration_sql
+                )
+
+            connection.rollback()
 
             with pytest.raises(
                 psycopg.errors.DuplicateColumn

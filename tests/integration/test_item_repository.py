@@ -1,3 +1,5 @@
+import os
+
 import psycopg
 import pytest
 
@@ -144,3 +146,50 @@ def test_database_rejects_negative_quantity():
         )
 
     assert get_all_items() == []
+
+
+def test_individual_item_is_returned_but_not_low_stock():
+    """Verify individual assets are readable but never low stock."""
+    test_database_url = os.environ["TEST_DATABASE_URL"]
+
+    with psycopg.connect(test_database_url) as connection:
+        created_row = connection.execute(
+            """
+            INSERT INTO hit.items (
+                name,
+                category,
+                location,
+                tracking_mode,
+                quantity,
+                minimum_quantity,
+                notes
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (
+                "Cordless drill",
+                "Tools",
+                "Garage",
+                "individual",
+                None,
+                None,
+                "Blue carrying case",
+            ),
+        ).fetchone()
+
+    assert created_row is not None
+    item_id = created_row[0]
+
+    retrieved_item = get_item_by_id(item_id)
+
+    assert retrieved_item is not None
+    assert retrieved_item["tracking_mode"] == "individual"
+    assert retrieved_item["quantity"] is None
+    assert retrieved_item["minimum_quantity"] is None
+
+    low_stock_ids = {
+        item["id"] for item in get_low_stock_items()
+    }
+
+    assert item_id not in low_stock_ids
