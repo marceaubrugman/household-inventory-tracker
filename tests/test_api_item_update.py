@@ -1,5 +1,6 @@
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
@@ -29,6 +30,7 @@ def test_update_item_returns_updated_item(
             "quantity": 8,
             "minimum_quantity": 1,
             "location": "Pantry",
+            "tracking_mode": "quantity",
             "notes": "Basmati",
         }
 
@@ -49,7 +51,7 @@ def test_update_item_returns_updated_item(
         "updates": {"quantity": 8},
     }
     assert response.json()["quantity"] == 8
-
+    assert response.json()["tracking_mode"] == "quantity"
 
 def test_update_item_returns_404_when_missing(
     monkeypatch,
@@ -126,6 +128,7 @@ def test_update_item_allows_notes_to_be_cleared(
             "quantity": 3,
             "minimum_quantity": 1,
             "location": "Pantry",
+            "tracking_mode": "quantity",
             "notes": None,
         }
 
@@ -143,3 +146,115 @@ def test_update_item_allows_notes_to_be_cleared(
     assert response.status_code == 200
     assert received_updates == {"notes": None}
     assert response.json()["notes"] is None
+
+
+def test_update_item_switches_to_individual_tracking(
+    monkeypatch,
+) -> None:
+    """Verify an item can switch to individual tracking."""
+    received_updates: dict[str, Any] = {}
+
+    def fake_update_inventory_item(
+        item_id: int,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        assert item_id == 7
+        received_updates.update(updates)
+
+        return {
+            "id": 7,
+            "name": "Cordless drill",
+            "category": "Tools",
+            "location": "Garage",
+            "tracking_mode": "individual",
+            "quantity": None,
+            "minimum_quantity": None,
+            "notes": "Blue carrying case",
+        }
+
+    monkeypatch.setattr(
+        items_router.item_service,
+        "update_inventory_item",
+        fake_update_inventory_item,
+    )
+
+    payload = {
+        "tracking_mode": "individual",
+        "quantity": None,
+        "minimum_quantity": None,
+    }
+
+    response = client.patch(
+        "/items/7",
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    assert received_updates == payload
+    assert response.json() == {
+        "id": 7,
+        "name": "Cordless drill",
+        "category": "Tools",
+        "location": "Garage",
+        "tracking_mode": "individual",
+        "quantity": None,
+        "minimum_quantity": None,
+        "notes": "Blue carrying case",
+    }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "tracking_mode": "individual",
+        },
+        {
+            "tracking_mode": "individual",
+            "quantity": 1,
+            "minimum_quantity": 0,
+        },
+        {
+            "tracking_mode": "quantity",
+            "quantity": None,
+            "minimum_quantity": None,
+        },
+        {
+            "tracking_mode": "quantity",
+            "quantity": 1,
+        },
+        {
+            "quantity": None,
+        },
+    ],
+)
+
+
+def test_update_item_rejects_invalid_tracking_mode_transition(
+    monkeypatch,
+    payload,
+) -> None:
+    """Verify incomplete or inconsistent mode changes are rejected."""
+    service_was_called = False
+
+    def fake_update_inventory_item(
+        item_id: int,
+        updates: dict[str, Any],
+    ) -> dict[str, Any]:
+        nonlocal service_was_called
+        service_was_called = True
+        return {}
+
+    monkeypatch.setattr(
+        items_router.item_service,
+        "update_inventory_item",
+        fake_update_inventory_item,
+    )
+
+    response = client.patch(
+        "/items/7",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    assert service_was_called is False

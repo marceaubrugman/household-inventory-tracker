@@ -20,6 +20,7 @@ def fake_existing_item(item_id: int) -> dict[str, Any]:
         "quantity": 4,
         "minimum_quantity": 2,
         "location": "Pantry",
+        "tracking_mode": "quantity",
         "notes": "Whole wheat",
         "created_at": "2026-06-29T08:00:00+00:00",
         "updated_at": "2026-06-29T08:00:00+00:00",
@@ -49,6 +50,7 @@ def test_get_item_returns_inventory_item() -> None:
         "quantity": 4,
         "minimum_quantity": 2,
         "location": "Pantry",
+        "tracking_mode": "quantity",
         "notes": "Whole wheat",
     }
 
@@ -78,3 +80,48 @@ def test_get_item_rejects_non_positive_id() -> None:
     response = client.get("/items/0")
 
     assert response.status_code == 422
+
+
+def fake_existing_individual_item(
+    item_id: int,
+) -> dict[str, Any]:
+    """Return one individually tracked asset."""
+    assert item_id == 2
+
+    return {
+        "id": 2,
+        "name": "Cordless drill",
+        "category": "Tools",
+        "location": "Garage",
+        "tracking_mode": "individual",
+        "quantity": None,
+        "minimum_quantity": None,
+        "notes": "Blue carrying case",
+    }
+
+
+def test_get_item_returns_individual_item_without_quantities():
+    """Verify individual assets return null quantity fields."""
+    app.dependency_overrides[
+        fetch_item_by_id
+    ] = fake_existing_individual_item
+
+    try:
+        response = client.get("/items/2")
+    finally:
+        app.dependency_overrides.pop(
+            fetch_item_by_id,
+            None,
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": 2,
+        "name": "Cordless drill",
+        "category": "Tools",
+        "location": "Garage",
+        "tracking_mode": "individual",
+        "quantity": None,
+        "minimum_quantity": None,
+        "notes": "Blue carrying case",
+    }

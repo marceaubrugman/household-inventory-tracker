@@ -1,3 +1,5 @@
+import os
+
 import psycopg
 import pytest
 
@@ -30,6 +32,8 @@ def test_create_get_update_and_delete_item():
     assert isinstance(created_item["id"], int)
     assert created_item["name"] == "Coffee filters"
 
+    assert created_item["tracking_mode"] == "quantity"
+
     retrieved_item = get_item_by_id(created_item["id"])
 
     assert retrieved_item == created_item
@@ -39,6 +43,7 @@ def test_create_get_update_and_delete_item():
         name="Coffee filters",
         category="Food",
         location="Pantry",
+        tracking_mode="quantity",
         quantity=5,
         minimum_quantity=2,
         notes="Size 4 filters",
@@ -142,3 +147,97 @@ def test_database_rejects_negative_quantity():
         )
 
     assert get_all_items() == []
+
+
+def test_individual_item_is_returned_but_not_low_stock():
+    """Verify individual assets are readable but never low stock."""
+    test_database_url = os.environ["TEST_DATABASE_URL"]
+
+    with psycopg.connect(test_database_url) as connection:
+        created_row = connection.execute(
+            """
+            INSERT INTO hit.items (
+                name,
+                category,
+                location,
+                tracking_mode,
+                quantity,
+                minimum_quantity,
+                notes
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+            """,
+            (
+                "Cordless drill",
+                "Tools",
+                "Garage",
+                "individual",
+                None,
+                None,
+                "Blue carrying case",
+            ),
+        ).fetchone()
+
+    assert created_row is not None
+    item_id = created_row[0]
+
+    retrieved_item = get_item_by_id(item_id)
+
+    assert retrieved_item is not None
+    assert retrieved_item["tracking_mode"] == "individual"
+    assert retrieved_item["quantity"] is None
+    assert retrieved_item["minimum_quantity"] is None
+
+    low_stock_ids = {
+        item["id"] for item in get_low_stock_items()
+    }
+
+    assert item_id not in low_stock_ids
+
+
+def test_create_individual_item():
+    """Verify the repository creates an individual asset."""
+    created_item = create_item(
+        name="Cordless drill",
+        category="Tools",
+        location="Garage",
+        tracking_mode="individual",
+        quantity=None,
+        minimum_quantity=None,
+        notes="Blue carrying case",
+    )
+
+    assert created_item["name"] == "Cordless drill"
+    assert created_item["tracking_mode"] == "individual"
+    assert created_item["quantity"] is None
+    assert created_item["minimum_quantity"] is None
+
+
+def test_update_item_switches_to_individual_tracking():
+    """Verify the repository can change an item's tracking mode."""
+    created_item = create_item(
+        name="Cordless drill",
+        category="Tools",
+        location="Garage",
+        tracking_mode="quantity",
+        quantity=1,
+        minimum_quantity=0,
+        notes="Blue carrying case",
+    )
+
+    updated_item = update_item(
+        item_id=created_item["id"],
+        name="Cordless drill",
+        category="Tools",
+        location="Garage",
+        tracking_mode="individual",
+        quantity=None,
+        minimum_quantity=None,
+        notes="Blue carrying case",
+    )
+
+    assert updated_item is not None
+    assert updated_item["tracking_mode"] == "individual"
+    assert updated_item["quantity"] is None
+    assert updated_item["minimum_quantity"] is None

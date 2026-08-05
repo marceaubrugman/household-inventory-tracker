@@ -19,6 +19,7 @@ def fake_fetch_all_items() -> list[dict[str, Any]]:
             "quantity": 4,
             "minimum_quantity": 2,
             "location": "Pantry",
+            "tracking_mode": "quantity",
             "notes": "Whole wheat",
             "created_at": "2026-06-29T08:00:00+00:00",
             "updated_at": "2026-06-29T08:00:00+00:00",
@@ -44,6 +45,7 @@ def test_get_items_returns_inventory_items() -> None:
             "quantity": 4,
             "minimum_quantity": 2,
             "location": "Pantry",
+            "tracking_mode": "quantity",
             "notes": "Whole wheat",
         }
     ]

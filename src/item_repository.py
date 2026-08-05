@@ -39,6 +39,7 @@ def create_item(
     quantity,
     minimum_quantity,
     notes="",
+    tracking_mode="quantity",
 ):
     """Insert an inventory item and return the created row."""
     query = """
@@ -46,16 +47,18 @@ def create_item(
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes
         )
-        VALUES (%s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
         RETURNING
             id,
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes;
@@ -65,6 +68,7 @@ def create_item(
         name,
         category,
         location,
+        tracking_mode,
         quantity,
         minimum_quantity,
         notes,
@@ -92,6 +96,7 @@ def get_all_items(sort_key="name"):
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes
@@ -116,6 +121,7 @@ def get_item_by_id(item_id):
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes
@@ -145,6 +151,7 @@ def search_items(search_term):
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes
@@ -171,6 +178,7 @@ def update_item(
     quantity,
     minimum_quantity,
     notes,
+    tracking_mode,
 ):
     """Update an inventory item and return the changed row."""
     query = """
@@ -179,6 +187,7 @@ def update_item(
             name = %s,
             category = %s,
             location = %s,
+            tracking_mode = %s,
             quantity = %s,
             minimum_quantity = %s,
             notes = %s
@@ -188,6 +197,7 @@ def update_item(
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes;
@@ -197,6 +207,7 @@ def update_item(
         name,
         category,
         location,
+        tracking_mode,
         quantity,
         minimum_quantity,
         notes,
@@ -219,6 +230,7 @@ def delete_item(item_id):
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes;
@@ -241,11 +253,13 @@ def get_low_stock_items(sort_key="name"):
             name,
             category,
             location,
+            tracking_mode,
             quantity,
             minimum_quantity,
             notes
         FROM hit.items
-        WHERE quantity <= minimum_quantity
+        WHERE tracking_mode = 'quantity'
+        AND quantity <= minimum_quantity
         ORDER BY {sort_expression}, id;
         """
     ).format(
