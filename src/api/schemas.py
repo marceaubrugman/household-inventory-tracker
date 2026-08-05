@@ -103,16 +103,6 @@ class ItemUpdate(BaseModel):
                 )
 
         tracking_mode_supplied = (
-                "tracking_mode" in self.model_fields_set
-        )
-        quantity_supplied = (
-                "quantity" in self.model_fields_set
-        )
-        minimum_quantity_supplied = (
-                "minimum_quantity" in self.model_fields_set
-        )
-
-        tracking_mode_supplied = (
             "tracking_mode" in self.model_fields_set
         )
         quantity_supplied = (
