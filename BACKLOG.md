@@ -14,7 +14,7 @@ The project is developed incrementally. Each release should:
 
 ## Current Status
 
-**Current release candidate: v0.6.0**
+**Stable release: v0.6.0**
 
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
@@ -703,17 +703,17 @@ The release adds the first explicit schema-upgrade path while preserving existin
 * [x] Run the final API smoke test
 * [x] Run the final console regression test
 * [x] Verify that credentials and private inventory data are absent from tracked files
-* [ ] Commit the release documentation
-* [ ] Push `release/v0.6.0`
-* [ ] Open and review the release pull request
-* [ ] Confirm all GitHub Actions jobs pass
-* [ ] Merge the release pull request into `main`
-* [ ] Synchronize local `main`
-* [ ] Rerun the complete test suite on `main`
-* [ ] Create and push the annotated `v0.6.0` tag
-* [ ] Publish the GitHub Release
+* [x] Commit the release documentation
+* [x] Push `release/v0.6.0`
+* [x] Open and review the release pull request
+* [x] Confirm all GitHub Actions jobs pass
+* [x] Merge the release pull request into `main`
+* [x] Synchronize local `main`
+* [x] Rerun the complete test suite on `main`
+* [x] Create and push the annotated `v0.6.0` tag
+* [x] Publish the GitHub Release
 
-No v0.7.0 feature development should begin until the release lock is complete.
+The v0.6.0 release lock is complete. v0.7.0 feature development may now begin.
 
 ---
 
@@ -846,15 +846,33 @@ The first explicit SQL migrations were introduced in v0.6.0. More tooling should
 
 # Immediate Next Action
 
-Complete the v0.6.0 release lock:
+## v0.7.0: Reproducible Docker Startup
 
-1. save and review the updated `BACKLOG.md`
-2. review `DATABASE_PLAN.md` for outdated quantity-only or migration-planning statements
-3. run final documentation, dependency, compilation, and test checks
-4. perform the Docker image, Docker Compose, API, and console smoke tests
-5. inspect tracked files for credentials and private inventory data
-6. commit and push the release documentation
-7. open and review the release pull request
-8. merge the release branch into `main`
-9. rerun the complete test suite on `main`
-10. tag and publish `v0.6.0`
+### Goal
+
+Make HIT start reliably in a clean Docker environment without requiring manual database setup.
+
+A developer should be able to clone the repository, configure `.env`, run Docker Compose, and receive a working API backed by an initialized PostgreSQL database.
+
+### Objectives
+
+* Add a PostgreSQL health check
+* Start the API only after PostgreSQL is healthy
+* Add an application health check
+* Initialize the database schema automatically for a fresh Docker volume
+* Ensure schema initialization is safe to run more than once
+* Verify first-run startup from a clean environment
+* Verify repeat startup without data loss
+* Verify persistent data after container restart
+* Verify clear failure behavior when PostgreSQL cannot start
+* Keep PostgreSQL internal to the Compose network
+* Document the complete Docker startup and shutdown workflow
+* Add focused tests or smoke checks for the Docker lifecycle where practical
+
+### Scope guardrails
+
+* Keep the release focused on Docker startup reliability
+* Do not add Alembic in this release
+* Do not add authentication, frontend work, or Azure deployment
+* Do not expand API functionality unless required for health verification
+* Preserve the current PostgreSQL schema and v0.6.0 behavior
