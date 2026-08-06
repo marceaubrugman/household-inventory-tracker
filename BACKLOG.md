@@ -14,7 +14,7 @@ The project is developed incrementally. Each release should:
 
 ## Current Status
 
-**Current release candidate: v0.4.0**
+**Current release candidate: v0.6.0**
 
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
@@ -24,22 +24,31 @@ HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 The current implementation includes:
 
 * complete inventory CRUD through both interfaces
-* database-backed search, sorting, and low-stock monitoring in the console
+* separate `quantity` and `individual` tracking modes
+* database-backed search, sorting, and low-stock monitoring for quantity-tracked items
+* individually tracked durable assets with `NULL` quantity fields
 * validated FastAPI request and response models
+* atomic API transitions between tracking modes
 * secure parameterized SQL
-* PostgreSQL constraints
+* PostgreSQL constraints that enforce tracking-mode and quantity rules
+* sequential PostgreSQL schema migrations
+* a frozen v0.5.0 schema fixture for upgrade testing
 * application, service, repository, and database layers
 * controlled API error handling
 * JSON migration tooling
 * Dockerized local development for the FastAPI application and PostgreSQL
 * `.env.example` for local Docker configuration
-* unit, API, service, migration, and PostgreSQL integration tests
+* GitHub Actions checks for Python tests, PostgreSQL integration tests, and Docker image builds
+* unit, API, service, migration, repository, and full-stack PostgreSQL integration tests
+* 67 passing automated tests
 
 PostgreSQL remains the application’s source of truth.
 
-The JSON runtime used in v0.1.0 has been removed. JSON remains supported only as a migration source.
+The JSON runtime used in v0.1.0 has been removed. JSON remains supported only as a migration source, with imported records using quantity tracking.
 
-Docker Compose is now available for local development. It starts the FastAPI API service and a PostgreSQL 18 database service together.
+Docker Compose starts the FastAPI API service and a PostgreSQL 18 database service together for reproducible local development.
+
+The v0.6.0 feature work has been merged into `main`. Release documentation and final verification are being completed on `release/v0.6.0`.
 
 ## Current Architecture
 
@@ -94,6 +103,8 @@ PostgreSQL 18
 FastAPI does not connect directly to PostgreSQL. API requests pass through Python application, service, repository, and database layers.
 
 Inside Docker Compose, the API connects to PostgreSQL using the Compose service name `db`.
+
+Tracking-mode rules are shared across API schemas, the service layer, repository operations, and PostgreSQL constraints. The database remains the final integrity boundary.
 
 ---
 
@@ -524,101 +535,185 @@ Inside Docker Compose, the API connects to PostgreSQL using the Compose service 
 * [x] Document `docker compose down`
 * [x] Warn about `docker compose down -v`
 * [x] Update backlog for v0.4.0
-* [ ] Review `DATABASE_PLAN.md` and update only if outdated
-* [ ] Confirm documented project structure matches the repository
-* [ ] Run `git diff --check`
-* [ ] Check tracked files for credentials and private data
-* [ ] Run `python -m pip check`
-* [ ] Run `python -m compileall src`
-* [ ] Run tests without `TEST_DATABASE_URL`
-* [ ] Run tests with the isolated `hit_test` database
-* [ ] Run final Docker Compose smoke test
-* [ ] Run final API smoke test
-* [ ] Run final console regression test
-* [ ] Commit release documentation
-* [ ] Push the Docker feature branch
-* [ ] Open and review the pull request
-* [ ] Merge the feature branch into `main`
-* [ ] Rerun all tests on `main`
-* [ ] Create and push annotated Git tag `v0.4.0`
-* [ ] Publish GitHub Release `v0.4.0`
-* [ ] Verify that credentials and private data are absent from GitHub
+* [x] Review `DATABASE_PLAN.md` and update only if outdated
+* [x] Confirm documented project structure matches the repository
+* [x] Run `git diff --check`
+* [x] Check tracked files for credentials and private data
+* [x] Run `python -m pip check`
+* [x] Run `python -m compileall src`
+* [x] Run tests without `TEST_DATABASE_URL`
+* [x] Run tests with the isolated `hit_test` database
+* [x] Run final Docker Compose smoke test
+* [x] Run final API smoke test
+* [x] Run final console regression test
+* [x] Commit release documentation
+* [x] Push the Docker feature branch
+* [x] Open and review the pull request
+* [x] Merge the feature branch into `main`
+* [x] Rerun all tests on `main`
+* [x] Create and push annotated Git tag `v0.4.0`
+* [x] Publish GitHub Release `v0.4.0`
+* [x] Verify that credentials and private data are absent from GitHub
 
 ---
-
-# Current Priority
-
-## Complete and publish v0.4.0
-
-Before beginning new feature development:
-
-* [x] freeze the v0.4.0 feature set
-* [x] add Dockerfile
-* [x] add `.dockerignore`
-* [x] add Docker Compose for the API service
-* [x] add PostgreSQL service to Docker Compose
-* [x] connect FastAPI to Compose PostgreSQL
-* [x] move Docker configuration into `.env` and `.env.example`
-* [x] verify `GET /health`
-* [x] verify `GET /db-health`
-* [x] update `README.md`
-* [x] update `BACKLOG.md`
-* [ ] review `DATABASE_PLAN.md`
-* [ ] confirm documented project structure matches the repository
-* [ ] run `git diff --check`
-* [ ] inspect `git status`
-* [ ] run `python -m pip check`
-* [ ] run `python -m compileall src`
-* [ ] run tests without `TEST_DATABASE_URL`
-* [ ] run tests with the isolated `hit_test` database
-* [ ] run the final Docker Compose smoke test
-* [ ] run the final API smoke test
-* [ ] run the final console regression test
-* [ ] commit release documentation
-* [ ] push the feature branch
-* [ ] open and review the pull request
-* [ ] merge into `main`
-* [ ] rerun all tests on `main`
-* [ ] create and push `v0.4.0`
-* [ ] publish the GitHub Release
-* [ ] verify that credentials and private data are absent from GitHub
-
-No new feature development should begin until the release is complete.
-
----
-
-# Next Major Milestone
 
 ## v0.5.0: Continuous Integration
 
 ### Goal
 
-Add automated checks so that tests can run through GitHub Actions when code is pushed or a pull request is opened.
+Add automated checks so that project behavior is verified whenever code is pushed or a pull request is opened.
 
-This milestone introduces CI/CD concepts gradually, starting with continuous integration only.
+This milestone introduced continuous integration without expanding into production deployment or automated delivery.
 
 ### GitHub Actions foundation
 
-* [ ] Add a GitHub Actions workflow
-* [ ] Run the workflow on pull requests
-* [ ] Run the workflow on pushes to `main`
-* [ ] Install Python
-* [ ] Install project dependencies
-* [ ] Run unit and service tests
-* [ ] Run API tests
-* [ ] Report pass/fail status in GitHub
-* [ ] Keep the workflow small and understandable
+* [x] Add a GitHub Actions workflow
+* [x] Run the workflow on pull requests
+* [x] Run the workflow on pushes
+* [x] Install Python 3.14
+* [x] Install project dependencies
+* [x] Run non-integration Python tests
+* [x] Report pass/fail status in GitHub
+* [x] Keep the workflow small and understandable
+* [x] Configure read-only repository permissions
+
+### PostgreSQL integration job
+
+* [x] Add a PostgreSQL 18 service
+* [x] Create an isolated `hit_test` database
+* [x] Apply `sql/schema.sql`
+* [x] Run PostgreSQL integration tests
+* [x] Preserve the `_test` database-name cleanup safeguard
+* [x] Verify repository and database behavior in CI
+
+### Docker build job
+
+* [x] Add Docker image build validation
+* [x] Build the FastAPI image on a clean Ubuntu runner
+* [x] Verify that the Dockerfile and build context remain valid
+* [x] Keep runtime deployment outside the v0.5.0 scope
+
+### Verification and release
+
+* [x] Verify that a deliberately failing test causes CI to fail
+* [x] Restore the test suite after failure verification
+* [x] Document all three CI jobs
+* [x] Preserve console, API, PostgreSQL, and Docker Compose behavior
+* [x] Run the complete local test suite
+* [x] Merge the CI pull request into `main`
+* [x] Create and push the annotated `v0.5.0` tag
+* [x] Publish the GitHub Release
 
 ### Later CI improvements
 
-* [ ] Add dependency checks
-* [ ] Run `python -m pip check`
-* [ ] Run `python -m compileall src`
-* [ ] Add linting when a linting standard is chosen
-* [ ] Add a PostgreSQL test service
-* [ ] Run integration tests in CI
-* [ ] Build the Docker image in CI
-* [ ] Block merging when checks fail
+* [ ] Add dependency checks to CI
+* [ ] Run `python -m pip check` in CI
+* [ ] Run `python -m compileall src` in CI
+* [ ] Add linting after a project standard is chosen
+* [ ] Configure protected-branch rules when appropriate
+* [ ] Add coverage reporting when it provides useful evidence
+
+---
+
+# Current Release Milestone
+
+## v0.6.0: Inventory Domain Model
+
+### Goal
+
+Expand HIT beyond quantity-only inventory by introducing separate tracking modes for consumable supplies and individually tracked durable assets.
+
+The release adds the first explicit schema-upgrade path while preserving existing v0.5.0 data and quantity-based API compatibility.
+
+### Domain model
+
+* [x] Define `quantity` and `individual` tracking modes
+* [x] Keep quantity tracking as the default for existing and legacy records
+* [x] Require non-negative `quantity` and `minimum_quantity` values for quantity-tracked items
+* [x] Require `NULL` quantity fields for individually tracked assets
+* [x] Exclude individual assets from low-stock results
+* [x] Keep the model inside the existing single-table architecture
+
+### PostgreSQL migrations and constraints
+
+* [x] Add `sql/migrations/001_add_tracking_mode.sql`
+* [x] Add `sql/migrations/002_add_tracking_mode_quantity_rules.sql`
+* [x] Backfill existing inventory records to quantity tracking
+* [x] Add the `tracking_mode` default
+* [x] Add the allowed-values constraint
+* [x] Add the `tracking_mode` `NOT NULL` rule
+* [x] Relax the previous quantity-column `NOT NULL` rules
+* [x] Add a combined constraint matching quantity fields to the selected tracking mode
+* [x] Update `sql/schema.sql` to represent the final v0.6.0 schema
+* [x] Add a frozen `tests/integration/fixtures/schema_v0_5_0.sql` fixture
+* [x] Verify that the v0.5.0 schema upgrades without data loss
+
+### Application layers
+
+* [x] Expose `tracking_mode` through repository results
+* [x] Expose `tracking_mode` through service outcomes
+* [x] Expose `tracking_mode` through API request and response schemas
+* [x] Add Pydantic validation for tracking-mode and quantity combinations
+* [x] Support creation of quantity-tracked supplies
+* [x] Support creation of individually tracked assets
+* [x] Support atomic API transitions between tracking modes
+* [x] Preserve tracking mode during console updates
+* [x] Preserve legacy JSON import behavior through quantity tracking
+* [x] Keep SQL isolated inside the repository layer
+
+### Testing
+
+* [x] Add migration upgrade tests
+* [x] Add PostgreSQL tracking-mode constraint tests
+* [x] Add repository tests for both tracking modes
+* [x] Add service-layer tracking-mode tests
+* [x] Add API creation and update tests
+* [x] Add full-stack individual-item API tests
+* [x] Verify low-stock exclusion for individual assets
+* [x] Run the complete suite with 67 passing tests
+* [x] Merge feature pull request #7 into `main`
+
+### Documentation
+
+* [x] Update the current release number in `README.md`
+* [x] Add the v0.6.0 milestone and version-history entries
+* [x] Document quantity and individual item structures
+* [x] Document valid API creation payloads
+* [x] Document atomic tracking-mode transitions
+* [x] Update the documented PostgreSQL schema
+* [x] Document sequential migration behavior
+* [x] Update the documented project structure
+* [x] Update `BACKLOG.md` for v0.6.0
+
+### Release lock
+
+* [x] Freeze the v0.6.0 feature set
+* [x] Merge the completed feature work into `main`
+* [x] Create `release/v0.6.0`
+* [x] Review `DATABASE_PLAN.md`
+* [x] Confirm all current documentation matches the repository
+* [x] Run `git diff --check`
+* [x] Inspect `git status`
+* [x] Run `python -m pip check`
+* [x] Run `python -m compileall src`
+* [x] Run tests without `TEST_DATABASE_URL`
+* [x] Run the complete suite against the isolated `hit_test` database
+* [x] Run the final Docker image build
+* [x] Run the final Docker Compose smoke test
+* [x] Run the final API smoke test
+* [x] Run the final console regression test
+* [x] Verify that credentials and private inventory data are absent from tracked files
+* [ ] Commit the release documentation
+* [ ] Push `release/v0.6.0`
+* [ ] Open and review the release pull request
+* [ ] Confirm all GitHub Actions jobs pass
+* [ ] Merge the release pull request into `main`
+* [ ] Synchronize local `main`
+* [ ] Rerun the complete test suite on `main`
+* [ ] Create and push the annotated `v0.6.0` tag
+* [ ] Publish the GitHub Release
+
+No v0.7.0 feature development should begin until the release lock is complete.
 
 ---
 
@@ -641,19 +736,27 @@ This milestone introduces CI/CD concepts gradually, starting with continuous int
 ## API query capabilities
 
 * [ ] Add search query parameters
-* [ ] Add low-stock endpoint or query parameter
+* [ ] Add a low-stock endpoint or query parameter
 * [ ] Add approved sorting options
 * [ ] Add pagination
 * [ ] Add focused tests for query combinations
 * [ ] Document query behavior
 
-## Database migrations
+## Database migration tooling
 
-* [ ] Introduce formal schema migrations when required
-* [ ] Evaluate Alembic
-* [ ] Create a baseline migration
-* [ ] Test schema upgrades
-* [ ] Document migration commands
+The first explicit SQL migrations were introduced in v0.6.0. More tooling should be added only when migration complexity justifies it.
+
+* [x] Introduce sequential schema migrations when required
+* [x] Add a migration that introduces `tracking_mode`
+* [x] Add a migration that introduces tracking-mode quantity rules
+* [x] Test a schema upgrade from a frozen earlier release
+* [x] Preserve existing records during the upgrade
+* [x] Document the migration behavior
+* [ ] Add an automated migration runner
+* [ ] Add a schema-version or migration-history table
+* [ ] Define upgrade failure and rollback procedures
+* [ ] Evaluate Alembic when the project’s migration needs warrant another dependency
+* [ ] Add automated migration execution to deployment only after the process is understood
 
 ## Frontend foundation
 
@@ -675,8 +778,8 @@ This milestone introduces CI/CD concepts gradually, starting with continuous int
 
 ## Users and households
 
-* [ ] Add user model
-* [ ] Add household model
+* [ ] Add a user model
+* [ ] Add a household model
 * [ ] Associate inventory items with a household
 * [ ] Define household roles and permissions
 * [ ] Prevent cross-household data access
@@ -692,7 +795,7 @@ This milestone introduces CI/CD concepts gradually, starting with continuous int
 
 ## Azure deployment
 
-* [ ] Complete Azure fundamentals preparation
+* [ ] Complete Azure Fundamentals preparation
 * [ ] Select the initial Azure hosting service
 * [ ] Deploy the PostgreSQL-backed API
 * [ ] Configure managed secrets
@@ -734,18 +837,24 @@ This milestone introduces CI/CD concepts gradually, starting with continuous int
 18. Local development should be reproducible without hidden manual setup where practical.
 19. CI/CD should be added incrementally and only after the local workflow is stable.
 20. Docker is used to make development repeatable, not to hide architectural confusion.
+21. Domain distinctions should remain explicit across validation, application, repository, and database layers.
+22. Schema changes should be sequential, testable, and preserve existing data.
+23. Individually tracked assets should not be forced into quantity-based behavior.
+24. Release documentation must describe the current system rather than only its history.
 
 ---
 
 # Immediate Next Action
 
-Complete the v0.4.0 release checklist:
+Complete the v0.6.0 release lock:
 
-1. review `DATABASE_PLAN.md`
-2. check whether `menu.py` or `src/api/main.py` still expose `v0.3.0`
-3. run final documentation, dependency, and test checks
-4. perform the Docker Compose, API, and console smoke tests
-5. commit and push the release documentation
-6. open and review the pull request
-7. merge the Docker feature branch into `main`
-8. tag and publish `v0.4.0`
+1. save and review the updated `BACKLOG.md`
+2. review `DATABASE_PLAN.md` for outdated quantity-only or migration-planning statements
+3. run final documentation, dependency, compilation, and test checks
+4. perform the Docker image, Docker Compose, API, and console smoke tests
+5. inspect tracked files for credentials and private inventory data
+6. commit and push the release documentation
+7. open and review the release pull request
+8. merge the release branch into `main`
+9. rerun the complete test suite on `main`
+10. tag and publish `v0.6.0`

@@ -1,6 +1,6 @@
 def show_menu():
     """Display the main application menu."""
-    print("\nHousehold Inventory Tracker v0.4.0")
+    print("\nHousehold Inventory Tracker v0.6.0")
     print("1. Add item")
     print("2. View all items")
     print("3. Search items")

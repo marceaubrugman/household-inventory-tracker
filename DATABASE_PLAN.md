@@ -9,29 +9,47 @@ It records:
 * the PostgreSQL implementation introduced in v0.2.0
 * how the FastAPI interface added in v0.3.0 reuses the same database foundation
 * how Dockerized local development added in v0.4.0 runs PostgreSQL through Docker Compose
+* how GitHub Actions added in v0.5.0 verifies Python behavior, PostgreSQL integration, and Docker image builds
+* how v0.6.0 introduced quantity and individual tracking modes through sequential PostgreSQL migrations
 * the responsibilities of the database, repository, service, and interface layers
-* current security and integrity decisions
-* the migration path from JSON
+* current security, validation, migration, and integrity decisions
+* the migration path from the legacy JSON format
 * likely future database evolution
 
-The current database model is intentionally simple. Its purpose is to provide a reliable PostgreSQL foundation before introducing users, households, audit history, structured locations, formal schema migrations, and more advanced search.
+The current database model remains intentionally focused. It supports quantity-tracked supplies and individually tracked durable assets in one inventory table, providing a reliable PostgreSQL foundation before introducing users, households, audit history, structured locations, automated migration tooling, and more advanced search.
 
 ## Current Status
 
-**Implemented through HIT v0.4.0**
+**Implemented through HIT v0.6.0**
 
 PostgreSQL is the primary source of truth for inventory data.
 
-The previous JSON runtime storage has been removed from the application. JSON remains supported only as a legacy migration source.
+The previous JSON runtime storage has been removed from the application. JSON remains supported only as a legacy migration source. Imported legacy records use quantity tracking.
 
-No database schema migration was required for v0.4.0. The Dockerized local development setup reuses the same PostgreSQL schema and repository layer introduced in v0.2.0.
+HIT now distinguishes between:
 
-HIT can now run PostgreSQL in two local development modes:
+* `quantity` items, which require non-negative `quantity` and `minimum_quantity` values
+* `individual` items, which represent distinct durable assets and require both quantity fields to be `NULL`
+
+The `tracking_mode` domain rule is enforced across API schemas, service behavior, repository operations, and PostgreSQL constraints. PostgreSQL remains the final integrity boundary.
+
+v0.6.0 introduced the first explicit sequential schema-upgrade path:
+
+```text
+sql/migrations/001_add_tracking_mode.sql
+sql/migrations/002_add_tracking_mode_quantity_rules.sql
+```
+
+Migration tests upgrade a frozen v0.5.0 schema fixture and verify that existing data is preserved and backfilled to quantity tracking.
+
+HIT can run PostgreSQL in two local development modes:
 
 * manually managed PostgreSQL using a local `DATABASE_URL`
 * Docker Compose PostgreSQL using the `db` service and local `.env` configuration
 
 Docker Compose is intended for reproducible local development. It does not change PostgreSQL’s role as the source of truth and does not move SQL out of the repository layer.
+
+GitHub Actions, introduced in v0.5.0, verifies non-integration Python tests, PostgreSQL integration tests, and Docker image builds on pushes and pull requests.
 
 ## Current Persistence Architecture
 
@@ -91,7 +109,7 @@ PostgreSQL 18
 
 The console and FastAPI interfaces use the same PostgreSQL schema, repository functions, and connection layer.
 
-FastAPI does not connect directly to PostgreSQL. API requests pass through Python application, repository, and database layers.
+FastAPI does not connect directly to PostgreSQL. API requests pass through Python API, service, repository, and database layers.
 
 Inside Docker Compose, the API connects to PostgreSQL using the Compose service name:
 
@@ -104,6 +122,8 @@ The Docker Compose database connection string is provided through `.env` as:
 ```text
 DATABASE_URL=postgresql://hit_user:hit_password@db:5432/hit
 ```
+
+Tracking-mode data flows through all persistence-facing layers. The API can create both tracking modes and perform atomic transitions between them. The console currently remains quantity-oriented, but updates preserve the stored tracking mode of existing records.
 
 ## Database Environments
 
@@ -211,15 +231,32 @@ CREATE TABLE IF NOT EXISTS hit.items (
     name VARCHAR(100) NOT NULL,
     category VARCHAR(100) NOT NULL,
     location VARCHAR(100) NOT NULL,
-    quantity INTEGER NOT NULL
-        CONSTRAINT quantity_non_negative
-        CHECK (quantity >= 0),
-    minimum_quantity INTEGER NOT NULL
-        CONSTRAINT minimum_quantity_non_negative
-        CHECK (minimum_quantity >= 0),
-    notes TEXT NOT NULL DEFAULT ''
+    tracking_mode VARCHAR(20) NOT NULL DEFAULT 'quantity'
+        CONSTRAINT tracking_mode_allowed
+        CHECK (tracking_mode IN ('quantity', 'individual')),
+    quantity INTEGER
+        CONSTRAINT quantity_non_negative CHECK (quantity >= 0),
+    minimum_quantity INTEGER
+        CONSTRAINT minimum_quantity_non_negative CHECK (minimum_quantity >= 0),
+    notes TEXT NOT NULL DEFAULT '',
+    CONSTRAINT tracking_mode_quantity_fields
+    CHECK (
+        (
+            tracking_mode = 'quantity'
+            AND quantity IS NOT NULL
+            AND minimum_quantity IS NOT NULL
+        )
+        OR
+        (
+            tracking_mode = 'individual'
+            AND quantity IS NULL
+            AND minimum_quantity IS NULL
+        )
+    )
 );
 ```
+
+The standalone schema represents the final v0.6.0 state for clean environments. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
 
 ## Field Definitions
 
@@ -250,7 +287,7 @@ Examples:
 ```text
 Rice
 Dish soap
-Coffee filters
+Cordless drill
 ```
 
 ### `category`
@@ -268,6 +305,7 @@ Food
 Cleaning
 Bathroom
 Electronics
+Tools
 ```
 
 Categories are currently stored directly on each item. They may become a separate table later if reusable metadata, category management, reporting, or permissions require it.
@@ -291,29 +329,56 @@ Garage
 
 Locations are currently stored directly on each item. They may later become structured household locations.
 
+### `tracking_mode`
+
+```text
+VARCHAR(20) NOT NULL DEFAULT 'quantity'
+```
+
+The inventory behavior assigned to the item.
+
+Allowed values:
+
+```text
+quantity
+individual
+```
+
+`quantity` represents consumable or countable stock whose level can increase or decrease.
+
+`individual` represents one distinct durable asset, such as a drill, bicycle, or appliance.
+
+Existing v0.5.0 records are backfilled to `quantity` during migration. The database rejects unsupported tracking modes.
+
 ### `quantity`
 
 ```text
-INTEGER NOT NULL CHECK (quantity >= 0)
+INTEGER CHECK (quantity >= 0)
 ```
 
-The current stock quantity.
+For a quantity-tracked item, this stores the current stock quantity.
 
-Zero is valid and represents an item that is known but currently unavailable.
+Zero is valid and represents stock that is known but currently unavailable.
+
+For an individually tracked item, this field must be:
+
+```text
+NULL
+```
 
 Negative values are rejected by:
 
-* console validation
+* console validation where quantity input is exposed
 * Pydantic API validation
 * PostgreSQL constraints
 
 ### `minimum_quantity`
 
 ```text
-INTEGER NOT NULL CHECK (minimum_quantity >= 0)
+INTEGER CHECK (minimum_quantity >= 0)
 ```
 
-The quantity at which an item should be considered low stock.
+For a quantity-tracked item, this stores the level at which the item should be considered low stock.
 
 The current low-stock rule is:
 
@@ -325,6 +390,28 @@ An item is therefore low stock when its quantity is:
 
 * below the configured minimum
 * exactly equal to the configured minimum
+
+For an individually tracked item, this field must be:
+
+```text
+NULL
+```
+
+### Combined tracking-mode rule
+
+PostgreSQL enforces the valid field combinations:
+
+```text
+quantity mode
+    → quantity is not NULL
+    → minimum_quantity is not NULL
+
+individual mode
+    → quantity is NULL
+    → minimum_quantity is NULL
+```
+
+This prevents ambiguous records such as an individual asset with a stock count or a quantity-tracked supply without quantity data.
 
 ### `notes`
 
@@ -348,6 +435,19 @@ The API may accept `null` when clearing notes, but the repository and database n
 
 The PostgreSQL repository supports complete CRUD functionality plus search, sorting, and low-stock retrieval.
 
+Every returned item dictionary includes:
+
+```text
+id
+name
+category
+location
+tracking_mode
+quantity
+minimum_quantity
+notes
+```
+
 ## Create
 
 Repository function:
@@ -355,6 +455,8 @@ Repository function:
 ```python
 create_item(...)
 ```
+
+The function accepts `tracking_mode`, which defaults to `quantity` for compatibility with earlier callers.
 
 SQL behavior:
 
@@ -366,10 +468,22 @@ RETURNING ...;
 
 PostgreSQL generates the item ID and returns the complete created row.
 
+Valid domain combinations include:
+
+```text
+quantity
+    → non-negative quantity
+    → non-negative minimum_quantity
+
+individual
+    → NULL quantity
+    → NULL minimum_quantity
+```
+
 Used by:
 
-* console workflows
-* FastAPI service operations
+* console workflows for quantity-tracked items
+* FastAPI service operations for both tracking modes
 
 ## Read All
 
@@ -379,7 +493,7 @@ Repository function:
 get_all_items(sort_key="name")
 ```
 
-The database returns all inventory items in an approved sort order.
+The database returns all quantity and individual inventory items in an approved sort order.
 
 Supported sort keys:
 
@@ -462,15 +576,20 @@ WHERE id = %s
 RETURNING ...;
 ```
 
-The complete updated row is returned when the item exists.
+The repository receives and persists a complete item state, including `tracking_mode`.
 
 For the API:
 
 1. `item_service.py` loads the current item
 2. merges only supplied PATCH fields
 3. rejects unsupported update fields
-4. sends a complete update to the repository
-5. returns the refreshed item
+4. validates tracking-mode transition requirements
+5. sends a complete valid state to the repository
+6. returns the refreshed item
+
+A request that changes `tracking_mode` must include both quantity fields in a state valid for the target mode. This makes the transition atomic and prevents half-converted records.
+
+The console does not currently expose tracking-mode changes, but its update flow preserves the existing stored mode.
 
 This keeps HTTP partial-update behavior out of the repository and SQL layers.
 
@@ -511,10 +630,11 @@ get_low_stock_items(sort_key="name")
 The low-stock condition is evaluated in PostgreSQL:
 
 ```sql
-WHERE quantity <= minimum_quantity
+WHERE tracking_mode = 'quantity'
+  AND quantity <= minimum_quantity
 ```
 
-This avoids retrieving the complete inventory and filtering it in Python.
+This explicitly excludes individually tracked assets and avoids retrieving the complete inventory for filtering in Python.
 
 Low-stock retrieval remains available through the console. A dedicated API endpoint or query parameter is planned for a later version.
 
@@ -535,6 +655,8 @@ Quantity is sorted numerically:
 ```sql
 quantity
 ```
+
+Individually tracked assets contain `NULL` quantity values. They remain valid inventory records and are not treated as low stock.
 
 Each query also uses `id` as a stable secondary sort:
 
@@ -588,6 +710,7 @@ Parameterized execution is used for:
 * item names
 * categories
 * locations
+* tracking modes
 * quantities
 * notes
 * search patterns
@@ -609,10 +732,13 @@ The API currently validates:
 
 * required text fields
 * string lengths
+* allowed tracking-mode values
+* valid tracking-mode and quantity combinations
 * non-negative quantities
 * positive integer item IDs
-* partial update bodies
+* non-empty partial update bodies
 * required fields that may not be set to `null`
+* atomic tracking-mode transition payloads
 
 Pydantic validation improves the HTTP client experience, but PostgreSQL constraints remain the final data-integrity boundary.
 
@@ -697,16 +823,21 @@ Python validators reject:
 * invalid IDs
 * malformed menu input
 
+The current console remains quantity-oriented. When it updates an existing record, it preserves the stored tracking mode.
+
 ### API application layer
 
 Pydantic and service validation reject:
 
 * blank required text
+* unsupported tracking modes
+* invalid tracking-mode and quantity combinations
 * negative quantities
 * empty PATCH bodies
 * invalid item IDs
 * unsupported update fields
 * attempts to clear required fields
+* incomplete tracking-mode transitions
 
 ### Repository layer
 
@@ -715,15 +846,20 @@ The repository:
 * uses parameterized SQL
 * allowlists dynamic sort expressions
 * keeps SQL isolated from interfaces
+* reads and writes `tracking_mode`
 * returns predictable dictionaries or `None`
+* restricts low-stock retrieval to quantity-tracked items
 
 ### Database layer
 
 PostgreSQL enforces:
 
 * primary-key uniqueness
-* required fields through `NOT NULL`
-* non-negative quantities through `CHECK`
+* required descriptive fields through `NOT NULL`
+* allowed tracking-mode values
+* a default quantity tracking mode
+* non-negative quantity values when present
+* quantity fields that match the selected tracking mode
 * default empty notes
 
 This creates defense in depth:
@@ -733,7 +869,7 @@ console input or HTTP request
    ↓
 Python or Pydantic validation
    ↓
-service rules where applicable
+service and transition rules where applicable
    ↓
 parameterized repository operation
    ↓
@@ -770,6 +906,12 @@ scripts/migrate_json_to_postgres.py
 
 The migration tool imports data from the v0.1 JSON format.
 
+Legacy JSON has no tracking-mode field. Imported records therefore use the repository and database default:
+
+```text
+tracking_mode = quantity
+```
+
 ### Migration safeguards
 
 The migration:
@@ -780,6 +922,7 @@ The migration:
 * rejects duplicate IDs
 * rejects invalid or negative quantities
 * preserves legacy item IDs
+* imports records as quantity-tracked items
 * requires an empty target table
 * requires explicit confirmation
 * inserts all records in one transaction
@@ -803,6 +946,8 @@ If any database operation fails, the complete migration is rolled back.
 
 ## Testing Strategy
 
+The complete v0.6.0 suite contains 67 passing automated tests.
+
 ## Unit and service tests
 
 Tests that do not require PostgreSQL cover:
@@ -812,8 +957,10 @@ Tests that do not require PostgreSQL cover:
 * duplicate-ID rejection
 * required migration fields
 * quantity validation
+* tracking-mode validation
 * application-service behavior
 * partial-update merging
+* atomic tracking-mode transitions
 * deletion outcomes
 
 These tests use fakes and pytest monkeypatching.
@@ -826,8 +973,10 @@ FastAPI endpoint tests cover:
 * database health checks
 * list retrieval
 * single-item retrieval
-* creation
+* quantity-item creation
+* individual-item creation
 * partial updates
+* tracking-mode transitions
 * deletion
 * missing records
 * invalid input
@@ -847,11 +996,11 @@ Docker Compose smoke tests verify:
 * direct PostgreSQL access works through `docker compose exec db psql`
 * the stack stops cleanly with `docker compose down`
 
-These checks are manual for v0.4.0. They may become automated later through continuous integration.
+These remain release-level manual checks. GitHub Actions separately verifies that the Docker image builds successfully on a clean Ubuntu runner.
 
 ## PostgreSQL integration tests
 
-Integration tests execute the real repository functions against:
+Integration tests execute real SQL against:
 
 ```text
 hit_test
@@ -859,15 +1008,30 @@ hit_test
 
 They verify:
 
-* create
-* retrieve
-* update
-* delete
-* multi-field search
-* case-insensitive search
+* create, retrieve, update, and delete
+* both tracking modes
+* full-stack individual-item API behavior
+* multi-field and case-insensitive search
 * numeric sorting
-* low-stock retrieval
-* PostgreSQL constraint enforcement
+* low-stock retrieval and individual-item exclusion
+* PostgreSQL tracking-mode constraints
+* migration of a frozen v0.5.0 schema without data loss
+
+## Schema migration tests
+
+Migration tests use:
+
+```text
+tests/integration/fixtures/schema_v0_5_0.sql
+```
+
+They apply the sequential v0.6.0 migration files and verify:
+
+* existing records are preserved
+* existing records are backfilled to quantity tracking
+* the tracking-mode column receives its final default and constraints
+* quantity fields become nullable
+* combined tracking-mode quantity rules are enforced
 
 ## Test isolation
 
@@ -877,19 +1041,32 @@ The integration fixture:
 2. temporarily redirects `DATABASE_URL`
 3. checks the actual connected database name
 4. refuses destructive cleanup unless the name ends with `_test`
-5. truncates the test table before each test
-6. resets identity values
-7. cleans the table after each test
+5. prepares the required schema for each integration context
+6. truncates test data where appropriate
+7. resets identity values
+8. cleans test state after execution
 
-The safety check protects `hit_db` from accidental integration-test cleanup.
+The safety check protects development databases from accidental integration-test cleanup.
 
-When `TEST_DATABASE_URL` is absent, integration tests skip intentionally.
+When `TEST_DATABASE_URL` is absent, PostgreSQL integration tests skip intentionally.
+
+## Continuous integration
+
+GitHub Actions runs three independent jobs:
+
+* non-integration Python tests
+* PostgreSQL 18 integration tests against an isolated `hit_test` database
+* Docker image build validation
+
+CI runs on pushes and pull requests and uses read-only repository permissions.
 
 ## Current Database Decisions
 
 ### One inventory table
 
 The current schema uses one table deliberately.
+
+Both quantity-tracked supplies and individually tracked assets share descriptive fields and remain inside `hit.items`. The combined tracking-mode constraint makes their different quantity rules explicit without prematurely splitting the domain into separate tables.
 
 This keeps the current PostgreSQL model:
 
@@ -918,11 +1095,26 @@ Reasons:
 * reinforces PostgreSQL and SQL knowledge
 * keeps database behavior visible
 * supports secure parameter binding
+* makes migration SQL and constraints explicit
 * avoids introducing an abstraction before the schema stabilizes
 * creates stronger foundations for understanding future ORM behavior
 * keeps the current repository layer explicit and testable
 
 An ORM may be considered later, but it is not required for the current application.
+
+### Sequential SQL migrations before migration tooling
+
+v0.6.0 introduced explicit numbered SQL migration files because the schema changed for the first time.
+
+This approach currently provides:
+
+* visible SQL changes
+* an understandable upgrade sequence
+* transaction boundaries inside each migration
+* a frozen earlier schema for realistic upgrade testing
+* data-preservation evidence
+
+The project does not yet include an automated migration runner or migration-history table. Alembic should be evaluated only when growing migration complexity justifies the additional abstraction and dependency.
 
 ### Shared repository across interfaces
 
@@ -941,9 +1133,9 @@ This avoids:
 * interface-specific database behavior
 * separate sources of truth
 
-The API adds `item_service.py` above the repository for application operations such as partial-update merging.
+The API adds `item_service.py` above the repository for application operations such as partial-update merging and tracking-mode transitions.
 
-The console currently retains `inventory_workflows.py` as its coordination layer.
+The console retains `inventory_workflows.py` as its coordination layer and currently exposes quantity-oriented workflows while preserving stored modes during updates.
 
 ### Docker Compose for local development
 
@@ -967,6 +1159,7 @@ Future Docker database improvements may include:
 * application health checks
 * startup ordering based on database readiness
 * automatic schema initialization in a clean Docker environment
+* controlled migration execution
 * clearer reset and seed workflows for local development
 
 ## Current Limitations
@@ -989,8 +1182,17 @@ The current database model does not yet support:
 * semantic search
 * trusted-successor access
 * production deployment
+* automated migration execution
+* migration-history tracking
+* automated rollback procedures
 
-The API also does not yet expose:
+The console currently does not expose:
+
+* creation of individually tracked assets
+* tracking-mode selection
+* tracking-mode transitions
+
+The API currently provides those tracking-mode operations, but it does not yet expose:
 
 * search queries
 * sorting options
@@ -1002,25 +1204,25 @@ The Docker local development setup also does not yet include:
 * database health checks
 * startup ordering based on PostgreSQL readiness
 * automatic first-run schema initialization
+* automatic migration execution
 * automated seed data
 * automated Docker-based test execution
 
-These are future capabilities, not unfinished v0.4.0 work.
+These are future capabilities, not unfinished v0.6.0 work.
 
-## Next Major Stage
+## Next Database Stage
 
-The next major development stage is continuous integration.
+The v0.6.0 database milestone is complete at the feature level and is undergoing release verification.
 
-The database-related goals for that stage are:
+Future database work should continue in bounded slices. Likely candidates include:
 
-* run automated tests through GitHub Actions
-* keep fast tests independent from PostgreSQL
-* decide when and how PostgreSQL integration tests should run in CI
-* eventually add a PostgreSQL service for integration testing in CI
-* preserve separation between development, Docker Compose, and test databases
-* prevent unsafe cleanup against non-test databases
+* API search, sorting, low-stock, and pagination support
+* an automated migration runner and migration-history table
+* Docker database readiness and initialization improvements
+* timestamps or audit-oriented fields when a concrete workflow requires them
+* Azure deployment planning after the local and CI paths remain stable
 
-Continuous integration should not change PostgreSQL’s role as the source of truth or move SQL out of the repository.
+The next slice should be selected through the project roadmap rather than introduced simultaneously. PostgreSQL should remain the source of truth, direct SQL should remain visible, and every schema change should include a tested upgrade path.
 
 ## Possible Future Database Evolution
 
@@ -1120,34 +1322,46 @@ Search improvements should be based on measured requirements and query analysis.
 
 ### Database migrations
 
-The current schema is applied through:
+v0.6.0 introduced the first explicit sequential schema migrations:
 
 ```text
-sql/schema.sql
+001_add_tracking_mode.sql
+002_add_tracking_mode_quantity_rules.sql
 ```
 
-As the schema develops, a formal migration tool may become useful.
+The current approach uses transaction-wrapped SQL files and a frozen v0.5.0 schema fixture for upgrade testing.
 
-Possible later choice:
+Likely next migration capabilities include:
 
-```text
-Alembic
-```
+* an automated migration runner
+* a schema-version or migration-history table
+* explicit failure and recovery procedures
+* controlled execution during local setup and deployment
+* rollback planning where reversible changes are practical
 
-This should be introduced when schema evolution across environments becomes more complex, not merely because the API exists.
+A formal migration framework such as Alembic may become useful when the number of migrations, environments, dependencies, or rollback requirements make the explicit SQL approach cumbersome. It should not be introduced merely because FastAPI is present.
 
 ### Continuous integration
 
-A later CI setup may define:
+v0.5.0 introduced GitHub Actions with:
 
-* Python dependency installation
-* fast unit and API tests
-* PostgreSQL service for integration tests
-* safe test database setup
-* Docker image build checks
-* automated feedback on pull requests
+* dependency installation
+* fast non-integration tests
+* a PostgreSQL 18 service for integration tests
+* isolated `hit_test` setup
+* Docker image build validation
+* automated feedback on pushes and pull requests
 
-CI should be added incrementally and should not replace local testing discipline.
+Future CI improvements may include:
+
+* `python -m pip check`
+* `python -m compileall src`
+* linting after a standard is selected
+* coverage reporting when it provides useful evidence
+* protected-branch rules
+* automated migration-runner verification
+
+CI should continue to complement, not replace, local testing discipline.
 
 ### Azure deployment
 
@@ -1177,11 +1391,12 @@ Potential future candidates include:
 LOWER(name)
 LOWER(category)
 LOWER(location)
+tracking_mode
 quantity
 minimum_quantity
 ```
 
-However, indexes should not be added automatically.
+A composite or partial index may eventually support quantity-only low-stock queries, but it should be justified by actual table size and query plans.
 
 Before adding an index:
 
@@ -1210,9 +1425,14 @@ The HIT database should evolve according to these principles:
 12. Every iteration must leave the system understandable and testable.
 13. Interfaces reuse repository operations instead of duplicating SQL.
 14. Public API errors must not expose internal database details.
-15. Database schema changes require deliberate migration planning.
-16. Dockerized development should make local setup more reproducible without hiding database behavior.
-17. CI should automate confidence checks without weakening local development discipline.
+15. Database schema changes require sequential, testable migration planning.
+16. Existing data must be preserved or deliberately transformed during upgrades.
+17. Dockerized development should make local setup more reproducible without hiding database behavior.
+18. CI should automate confidence checks without weakening local development discipline.
+19. Domain distinctions must remain explicit across validation, service, repository, and database layers.
+20. Individual assets should not be forced into quantity-based behavior.
+21. Automated migration tooling should be introduced only when it solves demonstrated complexity.
+22. Portfolio evidence should show both implementation and verification.
 
 ## v0.2.0 Database Milestone
 
@@ -1271,3 +1491,41 @@ HIT v0.4.0 established:
 No database schema migration was required for v0.4.0.
 
 The database foundation now supports both manual local development and Dockerized local development. Future database work can focus on schema evolution, migrations, indexing, users, households, audit history, CI integration, and production deployment.
+
+## v0.5.0 Continuous Integration Milestone
+
+HIT v0.5.0 established:
+
+* GitHub Actions on pushes and pull requests
+* a Python 3.14 non-integration test job
+* a PostgreSQL 18 service-based integration test job
+* isolated `hit_test` creation in CI
+* application of `sql/schema.sql` before integration tests
+* preservation of the `_test` cleanup safeguard
+* Docker image build validation on a clean Ubuntu runner
+* read-only workflow permissions
+* automated verification of Python, PostgreSQL, and Docker build behavior
+
+No database schema migration was required for v0.5.0.
+
+## v0.6.0 Inventory Domain Model Milestone
+
+HIT v0.6.0 established:
+
+* explicit `quantity` and `individual` tracking modes
+* quantity tracking as the default for existing and legacy records
+* nullable quantity fields for individually tracked assets
+* PostgreSQL constraints matching quantity fields to tracking mode
+* exclusion of individual assets from low-stock queries
+* tracking-mode support across repository, service, and API layers
+* atomic API transitions between tracking modes
+* preservation of tracking mode during console updates
+* sequential SQL migrations for upgrading the v0.5.0 schema
+* a frozen v0.5.0 schema fixture
+* migration tests that verify data preservation and backfilling
+* database-constraint, repository, service, API, and full-stack tests
+* a complete suite of 67 passing automated tests
+
+The database foundation now supports two explicit inventory behaviors while retaining one understandable table and direct SQL architecture.
+
+Future database work can focus on API query capabilities, automated migration tooling, Docker initialization, timestamps, users, households, audit history, indexing based on measured need, and Azure deployment.
