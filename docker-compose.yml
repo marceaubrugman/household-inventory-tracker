@@ -26,6 +26,7 @@ services:
       start_period: 5s
     volumes:
       - postgres_data:/var/lib/postgresql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
 
 volumes:
   postgres_data:
