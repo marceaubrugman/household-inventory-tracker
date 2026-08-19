@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: hit-api:v0.6.0
+    image: hit-api:v0.7.0
     ports:
       - "8000:8000"
     environment:

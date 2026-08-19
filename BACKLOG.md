@@ -14,7 +14,7 @@ The project is developed incrementally. Each release should:
 
 ## Current Status
 
-**Stable release: v0.6.0**
+**Release target: v0.7.0**
 
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
@@ -37,6 +37,9 @@ The current implementation includes:
 * controlled API error handling
 * JSON migration tooling
 * Dockerized local development for the FastAPI application and PostgreSQL
+* PostgreSQL and API Docker health checks
+* readiness-based API startup after PostgreSQL becomes healthy
+* automatic first-run schema initialization for fresh Docker volumes
 * `.env.example` for local Docker configuration
 * GitHub Actions checks for Python tests, PostgreSQL integration tests, and Docker image builds
 * unit, API, service, migration, repository, and full-stack PostgreSQL integration tests
@@ -48,7 +51,7 @@ The JSON runtime used in v0.1.0 has been removed. JSON remains supported only as
 
 Docker Compose starts the FastAPI API service and a PostgreSQL 18 database service together for reproducible local development.
 
-The v0.6.0 feature work has been merged into `main`. Release documentation and final verification are being completed on `release/v0.6.0`.
+The v0.7.0 feature work and Tock verification are complete on `feature/reproducible-docker-startup`. Release documentation and final Lock verification are in progress.
 
 ## Current Architecture
 
@@ -615,7 +618,7 @@ This milestone introduced continuous integration without expanding into producti
 
 ---
 
-# Current Release Milestone
+# Completed Release Milestone
 
 ## v0.6.0: Inventory Domain Model
 
@@ -713,7 +716,81 @@ The release adds the first explicit schema-upgrade path while preserving existin
 * [x] Create and push the annotated `v0.6.0` tag
 * [x] Publish the GitHub Release
 
-The v0.6.0 release lock is complete. v0.7.0 feature development may now begin.
+The v0.6.0 release lock is complete.
+
+---
+
+# Current Release Milestone
+
+## v0.7.0: Reproducible Docker Startup
+
+### Goal
+
+Make HIT start reliably in a clean Docker environment without requiring manual database setup.
+
+A developer should be able to clone the repository, configure `.env`, run Docker Compose, and receive a working API backed by an initialized PostgreSQL database.
+
+### Docker readiness and startup
+
+* [x] Add a PostgreSQL health check using `pg_isready`
+* [x] Start the API only after PostgreSQL is healthy
+* [x] Add an API health check using the existing `/health` endpoint
+* [x] Keep PostgreSQL internal to the Compose network
+* [x] Verify `docker compose config`
+
+### Fresh database initialization
+
+* [x] Mount `sql/schema.sql` read-only into `/docker-entrypoint-initdb.d/001-schema.sql`
+* [x] Initialize the HIT schema automatically for a fresh Docker volume
+* [x] Verify `hit.items` exists after first-run startup
+* [x] Verify PostgreSQL executes the initialization script on a fresh volume
+* [x] Verify existing volumes skip initialization
+* [x] Verify persisted data survives container recreation
+
+### Failure and recovery verification
+
+* [x] Verify a broken PostgreSQL health probe becomes unhealthy
+* [x] Verify an unhealthy PostgreSQL dependency blocks API cold start
+* [x] Verify a broken API health endpoint becomes unhealthy
+* [x] Verify both health checks recover after configuration is restored
+* [x] Reproduce and diagnose a shell-level `DATABASE_URL` override
+* [x] Verify corrected environment configuration requires API container recreation
+* [x] Verify clear failure behavior when PostgreSQL itself cannot start
+* [x] Verify `depends_on: service_healthy` controls startup ordering rather than runtime supervision
+
+### Automated and release verification
+
+* [x] Run tests without `TEST_DATABASE_URL` and confirm integration-test skips are intentional
+* [x] Run the complete suite against an isolated PostgreSQL `hit_test` database
+* [x] Confirm 67 passing automated tests
+* [x] Perform a final fresh-volume Docker lifecycle verification
+* [x] Verify `/health`
+* [x] Verify `/db-health`
+* [x] Verify automatic schema initialization
+* [x] Update README, backlog, database plan, and Living Learning Library
+* [x] Review application/configuration version references
+* [x] Run `git diff --check`
+* [x] Run `python -m pip check`
+* [x] Run `python -m compileall src`
+* [x] Run final console regression test
+* [x] Verify tracked files contain no credentials or private inventory data
+* [ ] Prepare and review the v0.7.0 release pull request
+* [ ] Confirm GitHub Actions passes
+* [ ] Merge release work into `main`
+* [ ] Rerun release verification on exact `main`
+* [ ] Create and push the annotated `v0.7.0` tag
+* [ ] Publish the GitHub Release
+* [ ] Create the v0.7.0 → v0.8.0 canonical handover
+
+### Scope guardrails preserved
+
+* [x] No Alembic
+* [x] No SQLAlchemy
+* [x] No authentication
+* [x] No frontend work
+* [x] No Azure deployment
+* [x] No unrelated API feature expansion
+* [x] PostgreSQL schema and v0.6.0 domain behavior preserved
 
 ---
 
@@ -721,17 +798,23 @@ The v0.6.0 release lock is complete. v0.7.0 feature development may now begin.
 
 ## Docker improvements
 
-* [ ] Add PostgreSQL health check
-* [ ] Add application health check
-* [ ] Start the API only after PostgreSQL is healthy
-* [ ] Apply `sql/schema.sql` automatically in a clean Docker environment
-* [ ] Decide how schema initialization is triggered
-* [ ] Verify first-run database creation
-* [ ] Verify repeat startup without data loss
-* [ ] Verify persistent data after container restart
-* [ ] Verify failed database startup behavior
+Completed in v0.7.0:
+
+* [x] Add PostgreSQL health check
+* [x] Add application health check
+* [x] Start the API only after PostgreSQL is healthy
+* [x] Apply `sql/schema.sql` automatically in a clean Docker environment
+* [x] Use PostgreSQL's first-run `/docker-entrypoint-initdb.d/` mechanism for schema initialization
+* [x] Verify first-run database creation
+* [x] Verify repeat startup without data loss
+* [x] Verify persistent data after container restart
+* [x] Verify failed database startup behavior
+
+Later:
+
 * [ ] Consider a non-root application user in the Docker image
 * [ ] Document image build commands separately if needed
+* [ ] Add controlled migration execution only when the migration workflow requires it
 
 ## API query capabilities
 
@@ -846,33 +929,6 @@ The first explicit SQL migrations were introduced in v0.6.0. More tooling should
 
 # Immediate Next Action
 
-## v0.7.0: Reproducible Docker Startup
+Complete the v0.7.0 Lock and release sequence.
 
-### Goal
-
-Make HIT start reliably in a clean Docker environment without requiring manual database setup.
-
-A developer should be able to clone the repository, configure `.env`, run Docker Compose, and receive a working API backed by an initialized PostgreSQL database.
-
-### Objectives
-
-* Add a PostgreSQL health check
-* Start the API only after PostgreSQL is healthy
-* Add an application health check
-* Initialize the database schema automatically for a fresh Docker volume
-* Ensure schema initialization is safe to run more than once
-* Verify first-run startup from a clean environment
-* Verify repeat startup without data loss
-* Verify persistent data after container restart
-* Verify clear failure behavior when PostgreSQL cannot start
-* Keep PostgreSQL internal to the Compose network
-* Document the complete Docker startup and shutdown workflow
-* Add focused tests or smoke checks for the Docker lifecycle where practical
-
-### Scope guardrails
-
-* Keep the release focused on Docker startup reliability
-* Do not add Alembic in this release
-* Do not add authentication, frontend work, or Azure deployment
-* Do not expand API functionality unless required for health verification
-* Preserve the current PostgreSQL schema and v0.6.0 behavior
+After v0.7.0 is released, select the v0.8.0 objective from the remaining roadmap based on the next strongest backend/data learning need. Do not broaden v0.7.0 during Lock.
