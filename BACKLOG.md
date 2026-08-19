@@ -774,8 +774,8 @@ A developer should be able to clone the repository, configure `.env`, run Docker
 * [x] Run `python -m compileall src`
 * [x] Run final console regression test
 * [x] Verify tracked files contain no credentials or private inventory data
-* [ ] Prepare and review the v0.7.0 release pull request
-* [ ] Confirm GitHub Actions passes
+* [x] Prepare and review the v0.7.0 release pull request
+* [x] Confirm GitHub Actions passes
 * [ ] Merge release work into `main`
 * [ ] Rerun release verification on exact `main`
 * [ ] Create and push the annotated `v0.7.0` tag
