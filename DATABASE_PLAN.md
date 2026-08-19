@@ -11,6 +11,7 @@ It records:
 * how Dockerized local development added in v0.4.0 runs PostgreSQL through Docker Compose
 * how GitHub Actions added in v0.5.0 verifies Python behavior, PostgreSQL integration, and Docker image builds
 * how v0.6.0 introduced quantity and individual tracking modes through sequential PostgreSQL migrations
+* how v0.7.0 made Docker startup reproducible through service health checks, readiness-based startup ordering, and automatic first-run schema initialization
 * the responsibilities of the database, repository, service, and interface layers
 * current security, validation, migration, and integrity decisions
 * the migration path from the legacy JSON format
@@ -20,7 +21,7 @@ The current database model remains intentionally focused. It supports quantity-t
 
 ## Current Status
 
-**Implemented through HIT v0.6.0**
+**Implemented through HIT v0.7.0**
 
 PostgreSQL is the primary source of truth for inventory data.
 
@@ -47,7 +48,7 @@ HIT can run PostgreSQL in two local development modes:
 * manually managed PostgreSQL using a local `DATABASE_URL`
 * Docker Compose PostgreSQL using the `db` service and local `.env` configuration
 
-Docker Compose is intended for reproducible local development. It does not change PostgreSQL’s role as the source of truth and does not move SQL out of the repository layer.
+Docker Compose is intended for reproducible local development. In v0.7.0, PostgreSQL gained a Docker health check, the API waits for PostgreSQL to become healthy before startup, the API gained its own Docker health check, and a fresh PostgreSQL volume automatically applies `sql/schema.sql` through `/docker-entrypoint-initdb.d/`. Existing volumes skip initialization and preserve their data. These changes do not alter PostgreSQL’s role as the source of truth or move SQL out of the repository layer.
 
 GitHub Actions, introduced in v0.5.0, verifies non-integration Python tests, PostgreSQL integration tests, and Docker image builds on pushes and pull requests.
 
@@ -256,7 +257,7 @@ CREATE TABLE IF NOT EXISTS hit.items (
 );
 ```
 
-The standalone schema represents the final v0.6.0 state for clean environments. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
+The standalone schema represents the final v0.6.0 database model and remains unchanged in v0.7.0. Fresh Docker environments now apply this schema automatically. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
 
 ## Field Definitions
 
@@ -946,7 +947,7 @@ If any database operation fails, the complete migration is rolled back.
 
 ## Testing Strategy
 
-The complete v0.6.0 suite contains 67 passing automated tests.
+The current suite contains 67 passing automated tests. v0.7.0 preserved the existing Python and PostgreSQL test coverage while adding release-level Docker lifecycle verification.
 
 ## Unit and service tests
 
@@ -985,18 +986,25 @@ FastAPI endpoint tests cover:
 
 FastAPI dependency overrides and monkeypatching keep most API tests isolated from PostgreSQL.
 
-## Docker Compose smoke tests
+## Docker Compose lifecycle checks
 
-Docker Compose smoke tests verify:
+Release-level Docker checks verify:
 
-* the API container starts
-* the PostgreSQL container starts
-* `/health` responds successfully
+* a fresh PostgreSQL volume initializes `sql/schema.sql` automatically
+* PostgreSQL becomes healthy through `pg_isready`
+* the API starts only after PostgreSQL is healthy
+* the API becomes healthy through its `/health` probe
+* `/health` confirms API liveness
 * `/db-health` confirms API-to-database connectivity
 * direct PostgreSQL access works through `docker compose exec db psql`
+* an existing volume skips initialization
+* persisted data survives container recreation
+* invalid PostgreSQL startup configuration produces a clear failure
+* an unhealthy PostgreSQL dependency blocks API cold start
+* host-level environment overrides can be diagnosed and corrected
 * the stack stops cleanly with `docker compose down`
 
-These remain release-level manual checks. GitHub Actions separately verifies that the Docker image builds successfully on a clean Ubuntu runner.
+These remain release-level manual lifecycle checks. GitHub Actions separately verifies that the Docker image builds successfully on a clean Ubuntu runner.
 
 ## PostgreSQL integration tests
 
@@ -1148,17 +1156,27 @@ The current Compose setup defines:
 * environment configuration through `.env`
 * persistent database volume
 * service-to-service database networking
+* PostgreSQL health checks through `pg_isready`
+* API health checks through `/health`
+* API startup ordering based on PostgreSQL `service_healthy`
+* automatic first-run schema initialization from `sql/schema.sql`
 * `/health` API liveness check
 * `/db-health` API-to-database connectivity check
 
 The Docker Compose setup is intended for local development. It is not a production deployment model.
 
+Important operational distinctions established in v0.7.0:
+
+* container process state and Docker health state are separate signals
+* `/health` measures API liveness, while `/db-health` verifies PostgreSQL connectivity
+* `depends_on: condition: service_healthy` controls startup ordering but does not provide runtime supervision after services are already running
+* inside the API container, PostgreSQL is reached as `db`, not `localhost`
+* host environment variables can override `.env` values during Compose configuration resolution
+* changing a host environment variable does not mutate an already-running container; the affected container must be recreated
+
 Future Docker database improvements may include:
 
-* PostgreSQL health checks
-* application health checks
-* startup ordering based on database readiness
-* automatic schema initialization in a clean Docker environment
+* a non-root application user
 * controlled migration execution
 * clearer reset and seed workflows for local development
 
@@ -1199,26 +1217,23 @@ The API currently provides those tracking-mode operations, but it does not yet e
 * low-stock retrieval
 * pagination
 
-The Docker local development setup also does not yet include:
+The Docker local development setup does not yet include:
 
-* database health checks
-* startup ordering based on PostgreSQL readiness
-* automatic first-run schema initialization
-* automatic migration execution
+* automatic migration execution for existing databases
 * automated seed data
 * automated Docker-based test execution
+* production-grade runtime supervision or orchestration
 
-These are future capabilities, not unfinished v0.6.0 work.
+These are future capabilities, not unfinished current-release work.
 
 ## Next Database Stage
 
-The v0.6.0 database milestone is complete at the feature level and is undergoing release verification.
+The v0.7.0 Docker-startup milestone is complete at the feature and lifecycle-verification level and is undergoing final release Lock.
 
 Future database work should continue in bounded slices. Likely candidates include:
 
 * API search, sorting, low-stock, and pagination support
 * an automated migration runner and migration-history table
-* Docker database readiness and initialization improvements
 * timestamps or audit-oriented fields when a concrete workflow requires them
 * Azure deployment planning after the local and CI paths remain stable
 
@@ -1528,4 +1543,23 @@ HIT v0.6.0 established:
 
 The database foundation now supports two explicit inventory behaviors while retaining one understandable table and direct SQL architecture.
 
-Future database work can focus on API query capabilities, automated migration tooling, Docker initialization, timestamps, users, households, audit history, indexing based on measured need, and Azure deployment.
+## v0.7.0 Reproducible Docker Startup Milestone
+
+HIT v0.7.0 established:
+
+* PostgreSQL container readiness checks through `pg_isready`
+* API startup ordering based on PostgreSQL `service_healthy`
+* API container health checks through the existing `/health` endpoint
+* automatic first-run application of `sql/schema.sql` through `/docker-entrypoint-initdb.d/001-schema.sql`
+* preservation of existing Docker volumes without destructive reinitialization
+* persistence of inventory data across container recreation
+* clear cold-start failure behavior when PostgreSQL cannot start
+* explicit distinction between API liveness and API-to-database connectivity
+* explicit understanding that Compose startup dependencies are not runtime supervision
+* reproducible diagnosis of host environment-variable overrides
+* preservation of the v0.6.0 PostgreSQL schema and domain behavior
+* a complete automated suite of 67 passing tests plus manual Docker lifecycle verification
+
+No database schema migration was required for v0.7.0.
+
+Future database work can focus on API query capabilities, automated migration tooling, timestamps, users, households, audit history, indexing based on measured need, and Azure deployment.
