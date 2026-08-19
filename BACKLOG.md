@@ -14,7 +14,7 @@ The project is developed incrementally. Each release should:
 
 ## Current Status
 
-**Release target: v0.7.0**
+**Stable release: v0.7.0**
 
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
@@ -776,11 +776,11 @@ A developer should be able to clone the repository, configure `.env`, run Docker
 * [x] Verify tracked files contain no credentials or private inventory data
 * [x] Prepare and review the v0.7.0 release pull request
 * [x] Confirm GitHub Actions passes
-* [ ] Merge release work into `main`
-* [ ] Rerun release verification on exact `main`
-* [ ] Create and push the annotated `v0.7.0` tag
-* [ ] Publish the GitHub Release
-* [ ] Create the v0.7.0 → v0.8.0 canonical handover
+* [x] Merge release work into `main`
+* [x] Rerun release verification on exact `main`
+* [x] Create and push the annotated `v0.7.0` tag
+* [x] Publish the GitHub Release
+* [x] Create the v0.7.0 → v0.8.0 canonical handover
 
 ### Scope guardrails preserved
 
