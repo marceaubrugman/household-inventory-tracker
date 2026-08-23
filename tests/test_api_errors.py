@@ -4,7 +4,7 @@ from typing import NoReturn
 import psycopg
 from fastapi.testclient import TestClient
 
-from src.api.dependencies import fetch_all_items
+from src.api.dependencies import fetch_items
 from src.api.main import app
 from src.database import DatabaseConfigurationError
 
@@ -19,14 +19,14 @@ def raise_database_configuration_error() -> NoReturn:
 
 def test_items_returns_503_when_database_is_not_configured() -> None:
     """Verify that database configuration errors become safe API responses."""
-    app.dependency_overrides[fetch_all_items] = (
+    app.dependency_overrides[fetch_items] = (
         raise_database_configuration_error
     )
 
     try:
         response = client.get("/items")
     finally:
-        app.dependency_overrides.pop(fetch_all_items, None)
+        app.dependency_overrides.pop(fetch_items, None)
 
     assert response.status_code == 503
     assert response.json() == {
@@ -45,7 +45,7 @@ def test_items_returns_503_when_database_operation_fails(
     caplog,
 ) -> None:
     """Verify that operational failures become safe 503 responses."""
-    app.dependency_overrides[fetch_all_items] = (
+    app.dependency_overrides[fetch_items] = (
         raise_database_operational_error
     )
 
@@ -56,7 +56,7 @@ def test_items_returns_503_when_database_operation_fails(
         ):
             response = client.get("/items")
     finally:
-        app.dependency_overrides.pop(fetch_all_items, None)
+        app.dependency_overrides.pop(fetch_items, None)
 
     assert response.status_code == 503
     assert response.json() == {

@@ -5,6 +5,7 @@ from src.item_repository import (
     delete_item,
     get_all_items,
     get_item_by_id,
+    search_items,
     update_item,
 )
 
@@ -12,6 +13,13 @@ from src.item_repository import (
 def list_inventory_items() -> list[dict[str, Any]]:
     """Return all inventory items."""
     return get_all_items()
+
+
+def search_inventory_items(
+    search_term: str,
+) -> list[dict[str, Any]]:
+    """Return inventory items matching the search term."""
+    return search_items(search_term)
 
 
 def find_inventory_item(item_id: int) -> dict[str, Any] | None:
