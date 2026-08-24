@@ -59,9 +59,11 @@ def test_get_items_with_search_returns_matching_items(
     """Verify that a search query returns matching inventory items."""
 
     def fake_search_inventory_items(
-        search_term: str,
+            search_term: str,
+            sort_key: str = "name",
     ) -> list[dict[str, Any]]:
         assert search_term == "Pasta"
+        assert sort_key == "name"
 
         return [
             {
@@ -108,8 +110,10 @@ def test_get_items_search_trims_surrounding_whitespace(
 
     def fake_search_inventory_items(
         search_term: str,
+        sort_key: str = "name",
     ) -> list[dict[str, Any]]:
         assert search_term == "Pasta"
+        assert sort_key == "name"
         return []
 
     monkeypatch.setattr(
@@ -153,3 +157,80 @@ def test_get_items_search_rejects_whitespace_only_term() -> None:
     assert response.json() == {
         "detail": "Search term cannot be blank."
     }
+
+
+def test_get_items_with_sort_forwards_sort_key(
+    monkeypatch,
+) -> None:
+    """Verify that an approved sort key reaches the list service."""
+
+    received_sort_keys: list[str] = []
+
+    def fake_list_inventory_items(
+        sort_key: str = "name",
+    ) -> list[dict[str, Any]]:
+        received_sort_keys.append(sort_key)
+        return []
+
+    monkeypatch.setattr(
+        dependencies,
+        "list_inventory_items",
+        fake_list_inventory_items,
+    )
+
+    response = client.get(
+        "/items",
+        params={"sort": "quantity"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert received_sort_keys == ["quantity"]
+
+
+def test_get_items_with_search_and_sort_forwards_both(
+    monkeypatch,
+) -> None:
+    """Verify that search and sort are forwarded together."""
+
+    received_arguments: list[tuple[str, str]] = []
+
+    def fake_search_inventory_items(
+        search_term: str,
+        sort_key: str = "name",
+    ) -> list[dict[str, Any]]:
+        received_arguments.append(
+            (search_term, sort_key)
+        )
+        return []
+
+    monkeypatch.setattr(
+        dependencies,
+        "search_inventory_items",
+        fake_search_inventory_items,
+    )
+
+    response = client.get(
+        "/items",
+        params={
+            "search": "rice",
+            "sort": "quantity",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert received_arguments == [
+        ("rice", "quantity")
+    ]
+
+
+def test_get_items_rejects_unsupported_sort_key() -> None:
+    """Verify that unsupported sort keys are rejected."""
+
+    response = client.get(
+        "/items",
+        params={"sort": "banana"},
+    )
+
+    assert response.status_code == 422

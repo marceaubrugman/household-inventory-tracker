@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import HTTPException, Path, Query, status
 
@@ -16,10 +16,16 @@ def fetch_items(
             description="Literal search across name, category, and location",
         ),
     ] = None,
+    sort: Annotated[
+        Literal["name", "category", "location", "quantity"],
+        Query(
+            description="Approved inventory sort order",
+        ),
+    ] = "name",
 ) -> list[dict[str, Any]]:
     """Fetch all items or items matching an optional search term."""
     if search is None:
-        return list_inventory_items()
+        return list_inventory_items(sort)
 
     normalized_search = search.strip()
 
@@ -29,7 +35,10 @@ def fetch_items(
             detail="Search term cannot be blank.",
         )
 
-    return search_inventory_items(normalized_search)
+    return search_inventory_items(
+        normalized_search,
+        sort,
+    )
 
 
 def fetch_item_by_id(

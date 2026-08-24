@@ -135,7 +135,7 @@ def get_item_by_id(item_id):
             return cursor.fetchone()
 
 
-def search_items(search_term):
+def search_items(search_term, sort_key="name"):
     """Return items matching a literal case-insensitive search term."""
     normalized_term = search_term.strip()
 
@@ -145,7 +145,10 @@ def search_items(search_term):
     escaped_term = _escape_like_pattern(normalized_term)
     pattern = f"%{escaped_term}%"
 
-    query = """
+    sort_expression = _get_sort_expression(sort_key)
+
+    query = sql.SQL(
+        """
         SELECT
             id,
             name,
@@ -159,8 +162,11 @@ def search_items(search_term):
         WHERE name ILIKE %s ESCAPE '!'
            OR category ILIKE %s ESCAPE '!'
            OR location ILIKE %s ESCAPE '!'
-        ORDER BY LOWER(name), id;
-    """
+        ORDER BY {sort_expression}, id;
+        """
+    ).format(
+        sort_expression=sort_expression
+    )
 
     parameters = (pattern, pattern, pattern)
 

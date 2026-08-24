@@ -9,7 +9,10 @@ def test_list_inventory_items_returns_repository_result(
     """Verify that listing items delegates to the repository."""
     expected_items = [{"id": 1}, {"id": 2}]
 
-    def fake_get_all_items() -> list[dict[str, Any]]:
+    def fake_get_all_items(
+        sort_key: str = "name",
+    ) -> list[dict[str, Any]]:
+        assert sort_key == "name"
         return expected_items
 
     monkeypatch.setattr(
@@ -464,4 +467,62 @@ def test_update_inventory_item_switches_tracking_mode(
         "notes": "Blue carrying case",
     }
     assert result == updated_item
+
+
+def test_list_inventory_items_forwards_sort_key(
+    monkeypatch,
+) -> None:
+    """Verify that listing forwards the requested sort order."""
+
+    received_sort_keys: list[str] = []
+
+    def fake_get_all_items(
+        sort_key: str = "name",
+    ) -> list[dict[str, Any]]:
+        received_sort_keys.append(sort_key)
+        return []
+
+    monkeypatch.setattr(
+        item_service,
+        "get_all_items",
+        fake_get_all_items,
+    )
+
+    result = item_service.list_inventory_items("quantity")
+
+    assert result == []
+    assert received_sort_keys == ["quantity"]
+
+
+def test_search_inventory_items_forwards_search_and_sort(
+    monkeypatch,
+) -> None:
+    """Verify that search forwards both query and sort order."""
+
+    received_arguments: list[tuple[str, str]] = []
+
+    def fake_search_items(
+        search_term: str,
+        sort_key: str = "name",
+    ) -> list[dict[str, Any]]:
+        received_arguments.append(
+            (search_term, sort_key)
+        )
+        return []
+
+    monkeypatch.setattr(
+        item_service,
+        "search_items",
+        fake_search_items,
+    )
+
+    result = item_service.search_inventory_items(
+        "rice",
+        "quantity",
+    )
+
+    assert result == []
+    assert received_arguments == [
+        ("rice", "quantity")
+    ]
 

@@ -10,16 +10,19 @@ from src.item_repository import (
 )
 
 
-def list_inventory_items() -> list[dict[str, Any]]:
-    """Return all inventory items."""
-    return get_all_items()
+def list_inventory_items(
+    sort_key: str = "name",
+) -> list[dict[str, Any]]:
+    """Return all inventory items in the requested sort order."""
+    return get_all_items(sort_key)
 
 
 def search_inventory_items(
     search_term: str,
+    sort_key: str = "name",
 ) -> list[dict[str, Any]]:
-    """Return inventory items matching the search term."""
-    return search_items(search_term)
+    """Return matching inventory items in the requested sort order."""
+    return search_items(search_term, sort_key)
 
 
 def find_inventory_item(item_id: int) -> dict[str, Any] | None:

@@ -92,6 +92,15 @@ def test_searches_multiple_fields_and_sorts_numerically():
         item["quantity"] for item in sorted_items
     ] == [2, 10]
 
+    searched_and_sorted_items = search_items(
+        "i",
+        "quantity",
+    )
+
+    assert [
+        item["quantity"] for item in searched_and_sorted_items
+    ] == [2, 10]
+
 
 def test_returns_items_at_or_below_minimum_quantity():
     """Verify PostgreSQL applies the low-stock rule."""
