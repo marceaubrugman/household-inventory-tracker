@@ -234,3 +234,110 @@ def test_get_items_rejects_unsupported_sort_key() -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_get_items_with_low_stock_forwards_filter(
+    monkeypatch,
+) -> None:
+    """Verify that low-stock filtering reaches the low-stock service."""
+
+    received_sort_keys: list[str] = []
+
+    def fake_list_low_stock_inventory_items(
+        sort_key: str = "name",
+    ) -> list[dict[str, Any]]:
+        received_sort_keys.append(sort_key)
+        return []
+
+    monkeypatch.setattr(
+        dependencies,
+        "list_low_stock_inventory_items",
+        fake_list_low_stock_inventory_items,
+    )
+
+    response = client.get(
+        "/items",
+        params={"low_stock": "true"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert received_sort_keys == ["name"]
+
+
+def test_get_items_with_low_stock_and_sort_forwards_both(
+    monkeypatch,
+) -> None:
+    """Verify that low-stock filtering preserves the requested sort order."""
+
+    received_sort_keys: list[str] = []
+
+    def fake_list_low_stock_inventory_items(
+        sort_key: str = "name",
+    ) -> list[dict[str, Any]]:
+        received_sort_keys.append(sort_key)
+        return []
+
+    monkeypatch.setattr(
+        dependencies,
+        "list_low_stock_inventory_items",
+        fake_list_low_stock_inventory_items,
+    )
+
+    response = client.get(
+        "/items",
+        params={
+            "low_stock": "true",
+            "sort": "quantity",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert received_sort_keys == ["quantity"]
+
+
+def test_get_items_with_low_stock_false_lists_normal_inventory(
+    monkeypatch,
+) -> None:
+    """Verify that low_stock=false preserves normal listing behavior."""
+
+    received_sort_keys: list[str] = []
+
+    def fake_list_inventory_items(
+        sort_key: str = "name",
+    ) -> list[dict[str, Any]]:
+        received_sort_keys.append(sort_key)
+        return []
+
+    monkeypatch.setattr(
+        dependencies,
+        "list_inventory_items",
+        fake_list_inventory_items,
+    )
+
+    response = client.get(
+        "/items",
+        params={"low_stock": "false"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert received_sort_keys == ["name"]
+
+
+def test_get_items_rejects_search_with_low_stock() -> None:
+    """Verify that search and low-stock filtering cannot be combined."""
+
+    response = client.get(
+        "/items",
+        params={
+            "search": "rice",
+            "low_stock": "true",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": "Search and low-stock filtering cannot be combined."
+    }

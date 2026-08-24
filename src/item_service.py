@@ -5,6 +5,7 @@ from src.item_repository import (
     delete_item,
     get_all_items,
     get_item_by_id,
+    get_low_stock_items,
     search_items,
     update_item,
 )
@@ -23,6 +24,13 @@ def search_inventory_items(
 ) -> list[dict[str, Any]]:
     """Return matching inventory items in the requested sort order."""
     return search_items(search_term, sort_key)
+
+
+def list_low_stock_inventory_items(
+    sort_key: str = "name",
+) -> list[dict[str, Any]]:
+    """Return low-stock inventory items in the requested sort order."""
+    return get_low_stock_items(sort_key)
 
 
 def find_inventory_item(item_id: int) -> dict[str, Any] | None:

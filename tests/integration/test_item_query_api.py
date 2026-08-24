@@ -214,3 +214,107 @@ def test_api_quantity_sort_places_individual_items_last():
         "Dish soap",
         "Cordless drill",
     ]
+
+
+def test_api_returns_only_low_stock_quantity_items():
+    """Verify low-stock filtering through the full API stack."""
+
+    items = [
+        {
+            "name": "Toilet paper",
+            "category": "Bathroom",
+            "location": "Closet",
+            "tracking_mode": "quantity",
+            "quantity": 1,
+            "minimum_quantity": 4,
+            "notes": "",
+        },
+        {
+            "name": "Pasta",
+            "category": "Food",
+            "location": "Pantry",
+            "tracking_mode": "quantity",
+            "quantity": 8,
+            "minimum_quantity": 3,
+            "notes": "",
+        },
+        {
+            "name": "Cordless drill",
+            "category": "Tools",
+            "location": "Garage",
+            "tracking_mode": "individual",
+            "quantity": None,
+            "minimum_quantity": None,
+            "notes": "",
+        },
+    ]
+
+    for payload in items:
+        assert client.post(
+            "/items",
+            json=payload,
+        ).status_code == 201
+
+    response = client.get(
+        "/items",
+        params={"low_stock": "true"},
+    )
+
+    assert response.status_code == 200
+
+    results = response.json()
+
+    assert [
+        item["name"]
+        for item in results
+    ] == [
+        "Toilet paper",
+    ]
+
+
+def test_api_sorts_low_stock_items_by_quantity():
+    """Verify low-stock results preserve approved sorting."""
+
+    items = [
+        {
+            "name": "Dishwasher tablets",
+            "category": "Cleaning",
+            "location": "Kitchen",
+            "tracking_mode": "quantity",
+            "quantity": 2,
+            "minimum_quantity": 2,
+            "notes": "",
+        },
+        {
+            "name": "Toilet paper",
+            "category": "Bathroom",
+            "location": "Closet",
+            "tracking_mode": "quantity",
+            "quantity": 1,
+            "minimum_quantity": 4,
+            "notes": "",
+        },
+    ]
+
+    for payload in items:
+        assert client.post(
+            "/items",
+            json=payload,
+        ).status_code == 201
+
+    response = client.get(
+        "/items",
+        params={
+            "low_stock": "true",
+            "sort": "quantity",
+        },
+    )
+
+    assert response.status_code == 200
+
+    results = response.json()
+
+    assert [
+        item["quantity"]
+        for item in results
+    ] == [1, 2]

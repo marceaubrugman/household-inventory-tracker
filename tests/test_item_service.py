@@ -526,3 +526,29 @@ def test_search_inventory_items_forwards_search_and_sort(
         ("rice", "quantity")
     ]
 
+
+def test_list_low_stock_inventory_items_forwards_sort_key(
+    monkeypatch,
+) -> None:
+    """Verify that low-stock listing forwards the requested sort order."""
+
+    received_sort_keys: list[str] = []
+
+    def fake_get_low_stock_items(
+        sort_key: str = "name",
+    ) -> list[dict[str, Any]]:
+        received_sort_keys.append(sort_key)
+        return []
+
+    monkeypatch.setattr(
+        item_service,
+        "get_low_stock_items",
+        fake_get_low_stock_items,
+    )
+
+    result = item_service.list_low_stock_inventory_items(
+        "quantity"
+    )
+
+    assert result == []
+    assert received_sort_keys == ["quantity"]
