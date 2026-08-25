@@ -2,7 +2,7 @@
 
 A Python, PostgreSQL, FastAPI, and Docker household inventory application with both a console interface and a REST API, built with a layered backend architecture.
 
-**Current release target: v0.8.0**
+**Current release: v0.8.0**
 
 ## Overview
 

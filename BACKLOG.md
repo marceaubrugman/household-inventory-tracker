@@ -14,7 +14,7 @@ The project is developed incrementally. Each release should:
 
 ## Current Status
 
-**Current release target: v0.8.0**
+**Stable release: v0.8.0**
 
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
@@ -844,18 +844,18 @@ Expose HIT's useful inventory query behavior through the FastAPI interface while
 * [x] Review and update `DATABASE_PLAN.md`
 * [x] Sweep tracked files for stale current-version references
 * [x] Review the complete documentation diff
-* [ ] Build the final Lock checklist
+* [x] Build the final Lock checklist
 
 ### Lock and Close tail
 
-* [ ] Run final dependency, compile, test, and whitespace checks
-* [ ] Run final Docker and API smoke verification
-* [ ] Verify tracked files contain no credentials or private inventory data
-* [ ] Push the completed feature branch
-* [ ] Prepare and review the v0.8.0 pull request
-* [ ] Confirm GitHub Actions passes
-* [ ] Merge into `main`
-* [ ] Rerun release verification on exact `main`
+* [x] Run final dependency, compile, test, and whitespace checks
+* [x] Run final Docker and API smoke verification
+* [x] Verify tracked files contain no credentials or private inventory data
+* [x] Push the completed feature branch
+* [x] Prepare and review the v0.8.0 pull request
+* [x] Confirm GitHub Actions passes
+* [x] Merge into `main`
+* [x] Rerun release verification on exact `main`
 * [ ] Create and push the annotated `v0.8.0` tag
 * [ ] Publish the GitHub Release
 * [ ] Clean up merged branches and prune references
@@ -1019,6 +1019,6 @@ The first explicit SQL migrations were introduced in v0.6.0. More tooling should
 
 # Immediate Next Action
 
-Complete the v0.8.0 Pre-Lock and Lock sequence without adding new feature scope.
+The v0.8.0 feature work, Tock hardening, Pre-Lock review, and final Lock verification are complete. The release is ready for tagging and publication.
 
-Before the documentation commit, sweep tracked files for stale current-version references and distinguish historical references from active version metadata. After v0.8.0 is released, create the canonical v0.8.0 → v0.9.0 handover. Azure deployment foundation is the leading next candidate, aligned with AZ-900 preparation and the Python/PostgreSQL/FastAPI/Docker roadmap, but it should be activated through the roadmap rather than folded into v0.8.0.
+After v0.8.0 is released, create the canonical v0.8.0 → v0.9.0 handover. Azure deployment foundation is the leading next candidate, aligned with AZ-900 preparation and the Python/PostgreSQL/FastAPI/Docker roadmap, but it should be activated through the roadmap rather than folded into v0.8.0.
