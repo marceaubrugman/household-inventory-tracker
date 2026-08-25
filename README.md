@@ -2,7 +2,7 @@
 
 A Python, PostgreSQL, FastAPI, and Docker household inventory application with both a console interface and a REST API, built with a layered backend architecture.
 
-**Current release: v0.7.0**
+**Current release target: v0.8.0**
 
 ## Overview
 
@@ -17,6 +17,7 @@ The project is being developed incrementally as a practical Python data and back
 * **v0.5.0:** GitHub Actions CI added for Python tests, PostgreSQL integration tests, and Docker image build validation
 * **v0.6.0:** Added quantity and individual tracking modes with PostgreSQL migrations, database constraints, API validation, and full-stack test coverage
 * **v0.7.0:** Added reproducible Docker startup with PostgreSQL and API health checks, readiness-based startup ordering, and automatic first-run schema initialization
+* **v0.8.0:** Added API inventory querying with literal case-insensitive search, approved sorting, low-stock filtering, and bounded pagination
 
 HIT now demonstrates:
 
@@ -56,6 +57,10 @@ HIT now demonstrates:
 * Check API liveness
 * Check API-to-database connectivity
 * List all inventory items
+* Search inventory by name, category, or location
+* Sort inventory by approved fields
+* Filter quantity-tracked items at or below minimum stock
+* Paginate inventory queries with validated limit and offset parameters
 * Retrieve one item by ID
 * Create inventory items
 * Partially update inventory items
@@ -227,6 +232,8 @@ The console application currently retains its existing workflow layer, while the
 
   * connects FastAPI dependency injection to application operations
   * validates item IDs used by read endpoints
+  * validates inventory query parameters
+  * routes list, search, low-stock, sorting, and pagination requests through the service layer
 
 * `src/api/schemas.py`
 
@@ -250,7 +257,7 @@ The console application currently retains its existing workflow layer, while the
 
   * contains PostgreSQL queries
   * performs create, read, update, and delete operations
-  * provides search, sorting, and low-stock retrieval
+  * provides search, approved sorting, low-stock retrieval, and pagination
   * keeps SQL out of interface and service code
 
 * `database.py`
@@ -272,11 +279,35 @@ The console application currently retains its existing workflow layer, while the
 | -------- | ------------------ | ---------------------------------- | -------------: |
 | `GET`    | `/health`          | Check API liveness                 |          `200` |
 | `GET`    | `/db-health`       | Check API-to-database connectivity |          `200` |
-| `GET`    | `/items`           | List all inventory items           |          `200` |
+| `GET`    | `/items`           | List and query inventory items      |          `200` |
 | `GET`    | `/items/{item_id}` | Retrieve one inventory item        |          `200` |
 | `POST`   | `/items`           | Create an inventory item           |          `201` |
 | `PATCH`  | `/items/{item_id}` | Partially update an inventory item |          `200` |
 | `DELETE` | `/items/{item_id}` | Delete an inventory item           |          `204` |
+
+### Inventory query parameters
+
+`GET /items` supports:
+
+| Parameter | Behavior |
+| --- | --- |
+| `search` | Literal case-insensitive search across name, category, and location |
+| `sort` | Sort by `name`, `category`, `location`, or `quantity` |
+| `low_stock` | Return only quantity-tracked items at or below minimum quantity |
+| `limit` | Optional result limit from `1` to `100` |
+| `offset` | Number of matching items to skip; defaults to `0` |
+
+Results default to name sorting when no `sort` parameter is supplied. Omitting `limit` preserves unpaginated listing behavior.
+
+`search` and `low_stock=true` cannot currently be combined and return `422`.
+
+Example queries:
+
+```bash
+curl "http://localhost:8000/items?search=rice"
+curl "http://localhost:8000/items?low_stock=true&sort=quantity"
+curl "http://localhost:8000/items?sort=name&limit=20&offset=20"
+```
 
 ### API behavior
 
@@ -378,6 +409,10 @@ HIT includes several defensive programming, testing, and local-development pract
 * parameterized Psycopg queries
 * no direct insertion of user values into SQL strings
 * allowlisted SQL sort expressions
+* escaped literal PostgreSQL search patterns for `%`, `_`, and `!`
+* validated API pagination bounds
+* parameterized PostgreSQL `LIMIT` and `OFFSET` values
+* deterministic query ordering with item ID tie-breaking
 * allowlisted service-layer update fields
 * Pydantic request and response validation
 * positive-integer validation for item IDs
@@ -999,8 +1034,6 @@ A single table remains intentional at this stage, keeping the domain model under
 * no user accounts or authentication
 * no household separation
 * no browser frontend
-* no pagination
-* no API search, sorting, or low-stock endpoints yet
 * no audit or stock-movement history
 * no continuous deployment pipeline yet
 * no production deployment
@@ -1012,8 +1045,6 @@ These limitations define later iterations rather than unfinished current-release
 
 Planned future work includes:
 
-* API search and low-stock query support
-* pagination
 * structured application logging
 * container hardening such as a non-root application user
 * evaluate Alembic when migration complexity justifies it
@@ -1026,6 +1057,18 @@ Planned future work includes:
 Features will continue to be added incrementally to preserve architectural clarity.
 
 ## Version History
+
+### v0.8.0
+
+* added literal case-insensitive API search across name, category, and location
+* added approved API sorting by name, category, location, and quantity
+* added API low-stock filtering for quantity-tracked items
+* added optional bounded pagination with `limit` and `offset`
+* preserved unpaginated listing behavior when no limit is supplied
+* added deterministic item-ID tie-breaking for stable sorted pagination
+* rejected unsupported sorting, invalid pagination ranges, blank searches, and unsupported search/low-stock combinations
+* verified literal handling of PostgreSQL search characters `%`, `_`, and `!`
+* added repository, service, API, and full-stack integration coverage for query composition and edge cases
 
 ### v0.7.0
 
@@ -1137,4 +1180,4 @@ GitHub: [marceaubrugman](https://github.com/marceaubrugman)
 
 ## Status
 
-HIT v0.7.0 is a PostgreSQL-backed inventory application with console and FastAPI interfaces, separate quantity and individual tracking modes, sequential schema migrations, database-enforced domain rules, validated CRUD and tracking-mode transitions, reproducible Docker startup with service health checks and automatic first-run schema initialization, and GitHub Actions CI covering Python behavior, PostgreSQL integration, and Docker image builds.
+HIT v0.8.0 is a PostgreSQL-backed inventory application with console and FastAPI interfaces, separate quantity and individual tracking modes, validated CRUD operations, API search, approved sorting, low-stock filtering, bounded pagination, reproducible Docker startup, sequential schema migrations, database-enforced domain rules, and GitHub Actions CI covering Python behavior, PostgreSQL integration, and Docker image builds.

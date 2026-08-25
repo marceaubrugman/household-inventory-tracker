@@ -14,7 +14,7 @@ The project is developed incrementally. Each release should:
 
 ## Current Status
 
-**Stable release: v0.7.0**
+**Current release target: v0.8.0**
 
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
@@ -26,6 +26,7 @@ The current implementation includes:
 * complete inventory CRUD through both interfaces
 * separate `quantity` and `individual` tracking modes
 * database-backed search, sorting, and low-stock monitoring for quantity-tracked items
+* FastAPI query support for literal search, approved sorting, low-stock filtering, and bounded pagination
 * individually tracked durable assets with `NULL` quantity fields
 * validated FastAPI request and response models
 * atomic API transitions between tracking modes
@@ -43,7 +44,7 @@ The current implementation includes:
 * `.env.example` for local Docker configuration
 * GitHub Actions checks for Python tests, PostgreSQL integration tests, and Docker image builds
 * unit, API, service, migration, repository, and full-stack PostgreSQL integration tests
-* 67 passing automated tests
+* 105 passing automated tests before final v0.8.0 Lock verification
 
 PostgreSQL remains the application’s source of truth.
 
@@ -51,7 +52,7 @@ The JSON runtime used in v0.1.0 has been removed. JSON remains supported only as
 
 Docker Compose starts the FastAPI API service and a PostgreSQL 18 database service together for reproducible local development.
 
-The v0.7.0 feature work and Tock verification are complete on `feature/reproducible-docker-startup`. Release documentation and final Lock verification are in progress.
+The v0.8.0 Tick and Tock work are complete on `feature/api-search-query`. Pre-Lock documentation and final Lock verification are in progress.
 
 ## Current Architecture
 
@@ -720,7 +721,7 @@ The v0.6.0 release lock is complete.
 
 ---
 
-# Current Release Milestone
+# Completed Release Milestone
 
 ## v0.7.0: Reproducible Docker Startup
 
@@ -794,6 +795,87 @@ A developer should be able to clone the repository, configure `.env`, run Docker
 
 ---
 
+# Current Release Milestone
+
+## v0.8.0: API Query Capabilities
+
+### Goal
+
+Expose HIT's useful inventory query behavior through the FastAPI interface while preserving secure SQL, clear service boundaries, backward-compatible listing behavior, and the existing PostgreSQL domain model.
+
+### Tick slices
+
+* [x] Add literal case-insensitive API search across name, category, and location
+* [x] Add approved sorting by name, category, location, and quantity
+* [x] Add low-stock filtering for quantity-tracked items
+* [x] Add optional bounded `limit` / `offset` pagination
+* [x] Preserve existing `GET /items` behavior when pagination is omitted
+* [x] Preserve individual-item exclusion from low-stock results
+* [x] Keep SQL values parameterized and dynamic sort structure allowlisted
+* [x] Preserve stable item-ID tie-breaking for deterministic ordering
+
+### API validation and composition
+
+* [x] Reject explicitly blank or whitespace-only search terms
+* [x] Reject unsupported sort keys through the API contract
+* [x] Limit supplied `limit` values to `1..100`
+* [x] Require non-negative `offset`
+* [x] Reject unsupported `search` plus `low_stock=true` composition
+* [x] Support search + sort + pagination
+* [x] Support low-stock + sort + pagination
+
+### Tock hardening
+
+* [x] Verify `%` is treated as a literal search character
+* [x] Verify `_` is treated as a literal search character
+* [x] Verify `!` is treated as a literal search character
+* [x] Verify stable item-ID tie-breaking when primary sort values tie
+* [x] Verify offsets beyond the final result set return an empty collection
+* [x] Verify low-stock + sort + pagination through the full API stack
+* [x] Preserve controlled database-failure behavior
+* [x] Run the complete suite with 105 passing automated tests before Pre-Lock
+
+### Pre-Lock
+
+* [x] Freeze v0.8.0 feature scope
+* [x] Review the complete v0.7.0 → v0.8.0 code and test delta
+* [x] Update `README.md` for v0.8.0 query behavior
+* [x] Review and update `BACKLOG.md`
+* [x] Review and update `DATABASE_PLAN.md`
+* [x] Sweep tracked files for stale current-version references
+* [x] Review the complete documentation diff
+* [ ] Build the final Lock checklist
+
+### Lock and Close tail
+
+* [ ] Run final dependency, compile, test, and whitespace checks
+* [ ] Run final Docker and API smoke verification
+* [ ] Verify tracked files contain no credentials or private inventory data
+* [ ] Push the completed feature branch
+* [ ] Prepare and review the v0.8.0 pull request
+* [ ] Confirm GitHub Actions passes
+* [ ] Merge into `main`
+* [ ] Rerun release verification on exact `main`
+* [ ] Create and push the annotated `v0.8.0` tag
+* [ ] Publish the GitHub Release
+* [ ] Clean up merged branches and prune references
+* [ ] Create the v0.8.0 → v0.9.0 canonical handover
+* [ ] Curate the Living Learning Library as the final learning step
+* [ ] Evaluate and publish a visibility post if the release provides useful evidence
+
+### Scope guardrails preserved
+
+* [x] No Alembic
+* [x] No SQLAlchemy
+* [x] No authentication
+* [x] No frontend work
+* [x] No Azure deployment inside v0.8.0
+* [x] No PostgreSQL schema migration
+* [x] Existing Docker startup behavior preserved
+* [x] Existing console behavior preserved
+
+---
+
 # Later Technical Milestones
 
 ## Docker improvements
@@ -818,12 +900,20 @@ Later:
 
 ## API query capabilities
 
-* [ ] Add search query parameters
-* [ ] Add a low-stock endpoint or query parameter
-* [ ] Add approved sorting options
-* [ ] Add pagination
-* [ ] Add focused tests for query combinations
-* [ ] Document query behavior
+Completed in v0.8.0:
+
+* [x] Add search query parameters
+* [x] Add a low-stock query parameter
+* [x] Add approved sorting options
+* [x] Add bounded pagination
+* [x] Add focused tests for query combinations and edge cases
+* [x] Document query behavior
+
+Later query evolution:
+
+* [ ] Add full-text search only when measured requirements justify it
+* [ ] Add indexing only after inspecting real query plans and data volume
+* [ ] Revisit richer filter composition when the product requires it
 
 ## Database migration tooling
 
@@ -929,6 +1019,6 @@ The first explicit SQL migrations were introduced in v0.6.0. More tooling should
 
 # Immediate Next Action
 
-Complete the v0.7.0 Lock and release sequence.
+Complete the v0.8.0 Pre-Lock and Lock sequence without adding new feature scope.
 
-After v0.7.0 is released, select the v0.8.0 objective from the remaining roadmap based on the next strongest backend/data learning need. Do not broaden v0.7.0 during Lock.
+Before the documentation commit, sweep tracked files for stale current-version references and distinguish historical references from active version metadata. After v0.8.0 is released, create the canonical v0.8.0 → v0.9.0 handover. Azure deployment foundation is the leading next candidate, aligned with AZ-900 preparation and the Python/PostgreSQL/FastAPI/Docker roadmap, but it should be activated through the roadmap rather than folded into v0.8.0.
