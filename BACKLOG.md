@@ -856,9 +856,9 @@ Expose HIT's useful inventory query behavior through the FastAPI interface while
 * [x] Confirm GitHub Actions passes
 * [x] Merge into `main`
 * [x] Rerun release verification on exact `main`
-* [ ] Create and push the annotated `v0.8.0` tag
-* [ ] Publish the GitHub Release
-* [ ] Clean up merged branches and prune references
+* [x] Create and push the annotated `v0.8.0` tag
+* [x] Publish the GitHub Release
+* [x] Clean up merged branches and prune references
 * [ ] Create the v0.8.0 → v0.9.0 canonical handover
 * [ ] Curate the Living Learning Library as the final learning step
 * [ ] Evaluate and publish a visibility post if the release provides useful evidence
@@ -1019,6 +1019,6 @@ The first explicit SQL migrations were introduced in v0.6.0. More tooling should
 
 # Immediate Next Action
 
-The v0.8.0 feature work, Tock hardening, Pre-Lock review, and final Lock verification are complete. The release is ready for tagging and publication.
+HIT v0.8.0 is released. Complete the Close tail by creating the canonical v0.8.0 → v0.9.0 handover, curating the Living Learning Library as the final learning step, and evaluating the release for visibility evidence.
 
-After v0.8.0 is released, create the canonical v0.8.0 → v0.9.0 handover. Azure deployment foundation is the leading next candidate, aligned with AZ-900 preparation and the Python/PostgreSQL/FastAPI/Docker roadmap, but it should be activated through the roadmap rather than folded into v0.8.0.
+Create the canonical v0.8.0 → v0.9.0 handover next. Azure deployment foundation is the leading candidate for the next release direction, aligned with AZ-900 preparation and the Python/PostgreSQL/FastAPI/Docker roadmap, but it should be activated through the roadmap rather than assumed automatically.
