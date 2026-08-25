@@ -430,3 +430,70 @@ def test_api_combines_search_sort_and_pagination():
         2,
         3,
     ]
+
+
+def test_api_combines_low_stock_sort_and_pagination():
+    """Verify low-stock filtering, sorting, and pagination compose."""
+
+    items = [
+        {
+            "name": "Toilet paper",
+            "category": "Bathroom",
+            "location": "Closet",
+            "tracking_mode": "quantity",
+            "quantity": 1,
+            "minimum_quantity": 4,
+            "notes": "",
+        },
+        {
+            "name": "Dishwasher tablets",
+            "category": "Cleaning",
+            "location": "Kitchen",
+            "tracking_mode": "quantity",
+            "quantity": 2,
+            "minimum_quantity": 2,
+            "notes": "",
+        },
+        {
+            "name": "Pasta",
+            "category": "Food",
+            "location": "Pantry",
+            "tracking_mode": "quantity",
+            "quantity": 8,
+            "minimum_quantity": 3,
+            "notes": "",
+        },
+        {
+            "name": "Cordless drill",
+            "category": "Tools",
+            "location": "Garage",
+            "tracking_mode": "individual",
+            "quantity": None,
+            "minimum_quantity": None,
+            "notes": "",
+        },
+    ]
+
+    for payload in items:
+        assert client.post(
+            "/items",
+            json=payload,
+        ).status_code == 201
+
+    response = client.get(
+        "/items",
+        params={
+            "low_stock": "true",
+            "sort": "quantity",
+            "limit": 1,
+            "offset": 1,
+        },
+    )
+
+    assert response.status_code == 200
+
+    results = response.json()
+
+    assert len(results) == 1
+    assert results[0]["name"] == "Dishwasher tablets"
+    assert results[0]["quantity"] == 2
