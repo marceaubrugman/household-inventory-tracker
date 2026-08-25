@@ -318,3 +318,115 @@ def test_api_sorts_low_stock_items_by_quantity():
         item["quantity"]
         for item in results
     ] == [1, 2]
+
+
+def test_api_paginates_inventory_items():
+    """Verify limit and offset through the full API stack."""
+
+    for name in [
+        "Apples",
+        "Bananas",
+        "Carrots",
+        "Dates",
+    ]:
+        payload = {
+            "name": name,
+            "category": "Food",
+            "location": "Pantry",
+            "tracking_mode": "quantity",
+            "quantity": 1,
+            "minimum_quantity": 0,
+            "notes": "",
+        }
+
+        assert client.post(
+            "/items",
+            json=payload,
+        ).status_code == 201
+
+    response = client.get(
+        "/items",
+        params={
+            "limit": 2,
+            "offset": 2,
+        },
+    )
+
+    assert response.status_code == 200
+
+    assert [
+        item["name"]
+        for item in response.json()
+    ] == [
+        "Carrots",
+        "Dates",
+    ]
+
+
+def test_api_combines_search_sort_and_pagination():
+    """Verify search, sorting, and pagination compose."""
+
+    items = [
+        {
+            "name": "Rice one",
+            "category": "Food",
+            "location": "Pantry",
+            "tracking_mode": "quantity",
+            "quantity": 4,
+            "minimum_quantity": 0,
+            "notes": "",
+        },
+        {
+            "name": "Rice two",
+            "category": "Food",
+            "location": "Pantry",
+            "tracking_mode": "quantity",
+            "quantity": 1,
+            "minimum_quantity": 0,
+            "notes": "",
+        },
+        {
+            "name": "Rice three",
+            "category": "Food",
+            "location": "Pantry",
+            "tracking_mode": "quantity",
+            "quantity": 3,
+            "minimum_quantity": 0,
+            "notes": "",
+        },
+        {
+            "name": "Rice four",
+            "category": "Food",
+            "location": "Pantry",
+            "tracking_mode": "quantity",
+            "quantity": 2,
+            "minimum_quantity": 0,
+            "notes": "",
+        },
+    ]
+
+    for payload in items:
+        assert client.post(
+            "/items",
+            json=payload,
+        ).status_code == 201
+
+    response = client.get(
+        "/items",
+        params={
+            "search": "rice",
+            "sort": "quantity",
+            "limit": 2,
+            "offset": 1,
+        },
+    )
+
+    assert response.status_code == 200
+
+    assert [
+        item["quantity"]
+        for item in response.json()
+    ] == [
+        2,
+        3,
+    ]

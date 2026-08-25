@@ -61,6 +61,8 @@ def test_get_items_with_search_returns_matching_items(
     def fake_search_inventory_items(
             search_term: str,
             sort_key: str = "name",
+            limit: int | None = None,
+            offset: int = 0,
     ) -> list[dict[str, Any]]:
         assert search_term == "Pasta"
         assert sort_key == "name"
@@ -111,6 +113,8 @@ def test_get_items_search_trims_surrounding_whitespace(
     def fake_search_inventory_items(
         search_term: str,
         sort_key: str = "name",
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         assert search_term == "Pasta"
         assert sort_key == "name"
@@ -168,6 +172,8 @@ def test_get_items_with_sort_forwards_sort_key(
 
     def fake_list_inventory_items(
         sort_key: str = "name",
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         received_sort_keys.append(sort_key)
         return []
@@ -198,6 +204,8 @@ def test_get_items_with_search_and_sort_forwards_both(
     def fake_search_inventory_items(
         search_term: str,
         sort_key: str = "name",
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         received_arguments.append(
             (search_term, sort_key)
@@ -245,6 +253,8 @@ def test_get_items_with_low_stock_forwards_filter(
 
     def fake_list_low_stock_inventory_items(
         sort_key: str = "name",
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         received_sort_keys.append(sort_key)
         return []
@@ -274,6 +284,8 @@ def test_get_items_with_low_stock_and_sort_forwards_both(
 
     def fake_list_low_stock_inventory_items(
         sort_key: str = "name",
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         received_sort_keys.append(sort_key)
         return []
@@ -306,6 +318,8 @@ def test_get_items_with_low_stock_false_lists_normal_inventory(
 
     def fake_list_inventory_items(
         sort_key: str = "name",
+        limit: int | None = None,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         received_sort_keys.append(sort_key)
         return []
@@ -341,3 +355,74 @@ def test_get_items_rejects_search_with_low_stock() -> None:
     assert response.json() == {
         "detail": "Search and low-stock filtering cannot be combined."
     }
+
+
+def test_get_items_forwards_pagination(
+    monkeypatch,
+) -> None:
+    """Verify that limit and offset reach the listing service."""
+
+    received_arguments = []
+
+    def fake_list_inventory_items(
+        sort_key: str = "name",
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        received_arguments.append(
+            (sort_key, limit, offset)
+        )
+        return []
+
+    monkeypatch.setattr(
+        dependencies,
+        "list_inventory_items",
+        fake_list_inventory_items,
+    )
+
+    response = client.get(
+        "/items",
+        params={
+            "limit": 20,
+            "offset": 40,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert received_arguments == [
+        ("name", 20, 40)
+    ]
+
+
+def test_get_items_rejects_limit_below_one() -> None:
+    """Verify that limit must be at least one."""
+
+    response = client.get(
+        "/items",
+        params={"limit": 0},
+    )
+
+    assert response.status_code == 422
+
+
+def test_get_items_rejects_limit_above_one_hundred() -> None:
+    """Verify that limit cannot exceed one hundred."""
+
+    response = client.get(
+        "/items",
+        params={"limit": 101},
+    )
+
+    assert response.status_code == 422
+
+
+def test_get_items_rejects_negative_offset() -> None:
+    """Verify that offset cannot be negative."""
+
+    response = client.get(
+        "/items",
+        params={"offset": -1},
+    )
+
+    assert response.status_code == 422

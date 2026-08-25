@@ -250,3 +250,144 @@ def test_update_item_switches_to_individual_tracking():
     assert updated_item["tracking_mode"] == "individual"
     assert updated_item["quantity"] is None
     assert updated_item["minimum_quantity"] is None
+
+
+def test_get_all_items_supports_limit_and_offset():
+    """Verify deterministic limit/offset pagination."""
+
+    for name in [
+        "Apples",
+        "Bananas",
+        "Carrots",
+        "Dates",
+    ]:
+        create_item(
+            name=name,
+            category="Food",
+            location="Pantry",
+            quantity=1,
+            minimum_quantity=0,
+            notes="",
+        )
+
+    first_page = get_all_items(
+        "name",
+        limit=2,
+        offset=0,
+    )
+
+    second_page = get_all_items(
+        "name",
+        limit=2,
+        offset=2,
+    )
+
+    assert [
+        item["name"]
+        for item in first_page
+    ] == [
+        "Apples",
+        "Bananas",
+    ]
+
+    assert [
+        item["name"]
+        for item in second_page
+    ] == [
+        "Carrots",
+        "Dates",
+    ]
+
+
+def test_search_items_supports_limit_and_offset():
+    """Verify search results support deterministic pagination."""
+
+    for name in [
+        "Rice one",
+        "Rice two",
+        "Rice three",
+        "Rice four",
+    ]:
+        create_item(
+            name=name,
+            category="Food",
+            location="Pantry",
+            quantity=1,
+            minimum_quantity=0,
+            notes="",
+        )
+
+    first_page = search_items(
+        "rice",
+        limit=2,
+        offset=0,
+    )
+
+    second_page = search_items(
+        "rice",
+        limit=2,
+        offset=2,
+    )
+
+    assert [
+        item["name"]
+        for item in first_page
+    ] == [
+        "Rice four",
+        "Rice one",
+    ]
+
+    assert [
+        item["name"]
+        for item in second_page
+    ] == [
+        "Rice three",
+        "Rice two",
+    ]
+
+
+def test_low_stock_items_support_limit_and_offset():
+    """Verify low-stock results support deterministic pagination."""
+
+    for name, quantity in [
+        ("Item A", 1),
+        ("Item B", 2),
+        ("Item C", 3),
+        ("Item D", 4),
+    ]:
+        create_item(
+            name=name,
+            category="Testing",
+            location="Storage",
+            quantity=quantity,
+            minimum_quantity=10,
+            notes="",
+        )
+
+    first_page = get_low_stock_items(
+        "name",
+        limit=2,
+        offset=0,
+    )
+
+    second_page = get_low_stock_items(
+        "name",
+        limit=2,
+        offset=2,
+    )
+
+    assert [
+        item["name"]
+        for item in first_page
+    ] == [
+        "Item A",
+        "Item B",
+    ]
+
+    assert [
+        item["name"]
+        for item in second_page
+    ] == [
+        "Item C",
+        "Item D",
+    ]

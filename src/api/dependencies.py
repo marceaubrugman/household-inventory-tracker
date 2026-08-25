@@ -29,6 +29,21 @@ def fetch_items(
             description="Return only quantity-tracked items at or below minimum quantity",
         ),
     ] = False,
+    limit: Annotated[
+        int | None,
+        Query(
+            ge=1,
+            le=100,
+            description="Maximum number of items to return",
+        ),
+    ] = None,
+    offset: Annotated[
+        int,
+        Query(
+            ge=0,
+            description="Number of matching items to skip",
+        ),
+    ] = 0,
 ) -> list[dict[str, Any]]:
     """Fetch inventory items according to the requested query options."""
     if search is not None and low_stock:
@@ -38,10 +53,18 @@ def fetch_items(
         )
 
     if low_stock:
-        return list_low_stock_inventory_items(sort)
+        return list_low_stock_inventory_items(
+            sort,
+            limit,
+            offset,
+        )
 
     if search is None:
-        return list_inventory_items(sort)
+        return list_inventory_items(
+            sort,
+            limit,
+            offset,
+        )
 
     normalized_search = search.strip()
 
@@ -54,6 +77,8 @@ def fetch_items(
     return search_inventory_items(
         normalized_search,
         sort,
+        limit,
+        offset,
     )
 
 

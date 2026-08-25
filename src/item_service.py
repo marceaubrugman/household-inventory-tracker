@@ -13,24 +13,43 @@ from src.item_repository import (
 
 def list_inventory_items(
     sort_key: str = "name",
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
-    """Return all inventory items in the requested sort order."""
-    return get_all_items(sort_key)
+    """Return inventory items in the requested sort order and range."""
+    return get_all_items(
+        sort_key,
+        limit,
+        offset,
+    )
 
 
 def search_inventory_items(
     search_term: str,
     sort_key: str = "name",
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
-    """Return matching inventory items in the requested sort order."""
-    return search_items(search_term, sort_key)
+    """Return matching inventory items in the requested sort order and range."""
+    return search_items(
+        search_term,
+        sort_key,
+        limit,
+        offset,
+    )
 
 
 def list_low_stock_inventory_items(
     sort_key: str = "name",
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
-    """Return low-stock inventory items in the requested sort order."""
-    return get_low_stock_items(sort_key)
+    """Return low-stock inventory items in the requested sort order and range."""
+    return get_low_stock_items(
+        sort_key,
+        limit,
+        offset,
+    )
 
 
 def find_inventory_item(item_id: int) -> dict[str, Any] | None:
