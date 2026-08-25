@@ -9,7 +9,7 @@ from fastapi import (
     status,
 )
 
-from src.api.dependencies import fetch_all_items, fetch_item_by_id
+from src.api.dependencies import fetch_item_by_id, fetch_items
 from src import item_service
 from src.api.schemas import (
     ItemCreate,
@@ -34,10 +34,10 @@ router = APIRouter(
 def list_items(
     items: Annotated[
         list[dict[str, Any]],
-        Depends(fetch_all_items),
+        Depends(fetch_items),
     ],
 ) -> list[dict[str, Any]]:
-    """Return all inventory items."""
+    """Return inventory items."""
     return items
 
 

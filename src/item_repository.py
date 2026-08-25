@@ -85,7 +85,11 @@ def create_item(
     return created_item
 
 
-def get_all_items(sort_key="name"):
+def get_all_items(
+    sort_key="name",
+    limit=None,
+    offset=0,
+):
     """Return all inventory items in the requested sort order."""
     sort_expression = _get_sort_expression(sort_key)
 
@@ -101,7 +105,9 @@ def get_all_items(sort_key="name"):
             minimum_quantity,
             notes
         FROM hit.items
-        ORDER BY {sort_expression}, id;
+        ORDER BY {sort_expression}, id
+        LIMIT %s
+        OFFSET %s;
         """
     ).format(
         sort_expression=sort_expression
@@ -109,7 +115,10 @@ def get_all_items(sort_key="name"):
 
     with get_connection() as connection:
         with connection.cursor(row_factory=dict_row) as cursor:
-            cursor.execute(query)
+            cursor.execute(
+                query,
+                (limit, offset),
+            )
             return cursor.fetchall()
 
 
@@ -135,7 +144,12 @@ def get_item_by_id(item_id):
             return cursor.fetchone()
 
 
-def search_items(search_term):
+def search_items(
+    search_term,
+    sort_key="name",
+    limit=None,
+    offset=0,
+):
     """Return items matching a literal case-insensitive search term."""
     normalized_term = search_term.strip()
 
@@ -145,7 +159,10 @@ def search_items(search_term):
     escaped_term = _escape_like_pattern(normalized_term)
     pattern = f"%{escaped_term}%"
 
-    query = """
+    sort_expression = _get_sort_expression(sort_key)
+
+    query = sql.SQL(
+        """
         SELECT
             id,
             name,
@@ -159,10 +176,21 @@ def search_items(search_term):
         WHERE name ILIKE %s ESCAPE '!'
            OR category ILIKE %s ESCAPE '!'
            OR location ILIKE %s ESCAPE '!'
-        ORDER BY LOWER(name), id;
-    """
+        ORDER BY {sort_expression}, id
+        LIMIT %s
+        OFFSET %s;
+        """
+    ).format(
+        sort_expression=sort_expression
+    )
 
-    parameters = (pattern, pattern, pattern)
+    parameters = (
+        pattern,
+        pattern,
+        pattern,
+        limit,
+        offset,
+    )
 
     with get_connection() as connection:
         with connection.cursor(row_factory=dict_row) as cursor:
@@ -242,7 +270,11 @@ def delete_item(item_id):
             return cursor.fetchone()
 
 
-def get_low_stock_items(sort_key="name"):
+def get_low_stock_items(
+    sort_key="name",
+    limit=None,
+    offset=0,
+):
     """Return items at or below their minimum quantity."""
     sort_expression = _get_sort_expression(sort_key)
 
@@ -260,7 +292,9 @@ def get_low_stock_items(sort_key="name"):
         FROM hit.items
         WHERE tracking_mode = 'quantity'
         AND quantity <= minimum_quantity
-        ORDER BY {sort_expression}, id;
+        ORDER BY {sort_expression}, id
+        LIMIT %s
+        OFFSET %s;
         """
     ).format(
         sort_expression=sort_expression
@@ -268,5 +302,8 @@ def get_low_stock_items(sort_key="name"):
 
     with get_connection() as connection:
         with connection.cursor(row_factory=dict_row) as cursor:
-            cursor.execute(query)
+            cursor.execute(
+                query,
+                (limit, offset),
+            )
             return cursor.fetchall()

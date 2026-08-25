@@ -12,6 +12,7 @@ It records:
 * how GitHub Actions added in v0.5.0 verifies Python behavior, PostgreSQL integration, and Docker image builds
 * how v0.6.0 introduced quantity and individual tracking modes through sequential PostgreSQL migrations
 * how v0.7.0 made Docker startup reproducible through service health checks, readiness-based startup ordering, and automatic first-run schema initialization
+* how v0.8.0 exposed secure API query capabilities through search, approved sorting, low-stock filtering, and bounded pagination
 * the responsibilities of the database, repository, service, and interface layers
 * current security, validation, migration, and integrity decisions
 * the migration path from the legacy JSON format
@@ -21,7 +22,7 @@ The current database model remains intentionally focused. It supports quantity-t
 
 ## Current Status
 
-**Implemented through HIT v0.7.0**
+**Implemented through HIT v0.8.0**
 
 PostgreSQL is the primary source of truth for inventory data.
 
@@ -51,6 +52,8 @@ HIT can run PostgreSQL in two local development modes:
 Docker Compose is intended for reproducible local development. In v0.7.0, PostgreSQL gained a Docker health check, the API waits for PostgreSQL to become healthy before startup, the API gained its own Docker health check, and a fresh PostgreSQL volume automatically applies `sql/schema.sql` through `/docker-entrypoint-initdb.d/`. Existing volumes skip initialization and preserve their data. These changes do not alter PostgreSQL’s role as the source of truth or move SQL out of the repository layer.
 
 GitHub Actions, introduced in v0.5.0, verifies non-integration Python tests, PostgreSQL integration tests, and Docker image builds on pushes and pull requests.
+
+v0.8.0 expanded the existing database-backed query path without changing the PostgreSQL schema. The FastAPI `GET /items` endpoint now exposes literal case-insensitive search, approved sorting, low-stock filtering, and optional bounded `limit`/`offset` pagination through the service and repository layers. SQL values remain parameterized, dynamic sort expressions remain allowlisted, and stable item-ID tie-breaking preserves deterministic ordering.
 
 ## Current Persistence Architecture
 
@@ -257,7 +260,7 @@ CREATE TABLE IF NOT EXISTS hit.items (
 );
 ```
 
-The standalone schema represents the final v0.6.0 database model and remains unchanged in v0.7.0. Fresh Docker environments now apply this schema automatically. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
+The standalone schema represents the final v0.6.0 database model and remains unchanged through v0.8.0. Fresh Docker environments now apply this schema automatically. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
 
 ## Field Definitions
 
@@ -434,7 +437,7 @@ The API may accept `null` when clearing notes, but the repository and database n
 
 ## Repository Operations
 
-The PostgreSQL repository supports complete CRUD functionality plus search, sorting, and low-stock retrieval.
+The PostgreSQL repository supports complete CRUD functionality plus search, approved sorting, low-stock retrieval, and optional pagination.
 
 Every returned item dictionary includes:
 
@@ -491,7 +494,7 @@ Used by:
 Repository function:
 
 ```python
-get_all_items(sort_key="name")
+get_all_items(sort_key="name", limit=None, offset=0)
 ```
 
 The database returns all quantity and individual inventory items in an approved sort order.
@@ -537,7 +540,7 @@ The API converts `None` into:
 Repository function:
 
 ```python
-search_items(search_term)
+search_items(search_term, sort_key="name", limit=None, offset=0)
 ```
 
 Search covers:
@@ -556,9 +559,9 @@ WHERE name ILIKE pattern
    OR location ILIKE pattern
 ```
 
-User-supplied `%` and `_` characters are escaped so they are treated literally rather than as unintended SQL pattern wildcards.
+User-supplied `%`, `_`, and `!` characters are escaped so they are treated literally rather than as unintended SQL pattern wildcards or escape syntax.
 
-Search remains available through the console. A dedicated API search capability is planned for a later version.
+Search remains available through the console and is exposed through FastAPI with `GET /items?search=...`. API search can be combined with approved sorting and pagination. Explicitly blank or whitespace-only searches are rejected with `422`.
 
 ## Update
 
@@ -625,7 +628,7 @@ The API does not return the deleted row, even though the repository makes it ava
 Repository function:
 
 ```python
-get_low_stock_items(sort_key="name")
+get_low_stock_items(sort_key="name", limit=None, offset=0)
 ```
 
 The low-stock condition is evaluated in PostgreSQL:
@@ -637,7 +640,7 @@ WHERE tracking_mode = 'quantity'
 
 This explicitly excludes individually tracked assets and avoids retrieving the complete inventory for filtering in Python.
 
-Low-stock retrieval remains available through the console. A dedicated API endpoint or query parameter is planned for a later version.
+Low-stock retrieval remains available through the console and is exposed through FastAPI with `GET /items?low_stock=true`. It can be combined with approved sorting and pagination. The API deliberately rejects `search` combined with `low_stock=true` in v0.8.0.
 
 ## Sorting Strategy
 
@@ -664,6 +667,22 @@ Each query also uses `id` as a stable secondary sort:
 ```sql
 ORDER BY selected_expression, id
 ```
+
+## Pagination
+
+Repository list, search, and low-stock queries accept optional `limit` and `offset` values.
+
+PostgreSQL applies them after deterministic ordering:
+
+```sql
+ORDER BY selected_expression, id
+LIMIT %s
+OFFSET %s
+```
+
+`limit` and `offset` are SQL values and are passed through Psycopg parameter binding. At the FastAPI boundary, supplied `limit` values must be between `1` and `100`, while `offset` defaults to `0` and must be non-negative. Omitting `limit` preserves the existing unpaginated behavior.
+
+The stable secondary `id` sort is important for pagination because rows with equal primary sort values still need deterministic page boundaries. Integration tests verify tied sort values and offsets beyond the final result set.
 
 ## Secure Dynamic Sorting
 
@@ -715,6 +734,7 @@ Parameterized execution is used for:
 * quantities
 * notes
 * search patterns
+* pagination limits and offsets
 * item IDs
 
 ### SQL identifiers and expressions
@@ -727,7 +747,7 @@ Dynamic SQL expressions such as sorting columns are handled through:
 
 ### API input boundaries
 
-The FastAPI interface adds another defensive layer through Pydantic validation.
+The FastAPI interface adds another defensive layer through FastAPI parameter validation and Pydantic request-model validation.
 
 The API currently validates:
 
@@ -740,6 +760,10 @@ The API currently validates:
 * non-empty partial update bodies
 * required fields that may not be set to `null`
 * atomic tracking-mode transition payloads
+* approved inventory sort keys
+* blank and whitespace-only search rejection
+* pagination bounds (`limit` from `1` to `100`, non-negative `offset`)
+* unsupported `search` plus `low_stock=true` combinations
 
 Pydantic validation improves the HTTP client experience, but PostgreSQL constraints remain the final data-integrity boundary.
 
@@ -828,7 +852,7 @@ The current console remains quantity-oriented. When it updates an existing recor
 
 ### API application layer
 
-Pydantic and service validation reject:
+FastAPI query validation, Pydantic models, and service validation reject:
 
 * blank required text
 * unsupported tracking modes
@@ -839,6 +863,10 @@ Pydantic and service validation reject:
 * unsupported update fields
 * attempts to clear required fields
 * incomplete tracking-mode transitions
+* unsupported inventory sort keys
+* blank inventory searches
+* invalid pagination ranges
+* unsupported search/low-stock combinations
 
 ### Repository layer
 
@@ -850,6 +878,8 @@ The repository:
 * reads and writes `tracking_mode`
 * returns predictable dictionaries or `None`
 * restricts low-stock retrieval to quantity-tracked items
+* applies optional parameterized pagination to list, search, and low-stock queries
+* uses stable item-ID tie-breaking for deterministic sorted pagination
 
 ### Database layer
 
@@ -868,7 +898,7 @@ This creates defense in depth:
 ```text
 console input or HTTP request
    ↓
-Python or Pydantic validation
+Python, FastAPI, or Pydantic validation
    ↓
 service and transition rules where applicable
    ↓
@@ -947,7 +977,7 @@ If any database operation fails, the complete migration is rolled back.
 
 ## Testing Strategy
 
-The current suite contains 67 passing automated tests. v0.7.0 preserved the existing Python and PostgreSQL test coverage while adding release-level Docker lifecycle verification.
+The current suite contains 105 passing automated tests before final v0.8.0 Lock verification. v0.8.0 expanded repository, service, API, and full-stack integration coverage for query parameters, composition, literal wildcard handling, deterministic pagination, and edge cases while preserving the v0.7.0 Docker lifecycle behavior.
 
 ## Unit and service tests
 
@@ -983,6 +1013,10 @@ FastAPI endpoint tests cover:
 * invalid input
 * missing database configuration
 * PostgreSQL operational failures
+* inventory search and surrounding-whitespace normalization
+* approved sorting and unsupported-sort rejection
+* low-stock filtering and unsupported search/low-stock combinations
+* pagination forwarding and bounds validation
 
 FastAPI dependency overrides and monkeypatching keep most API tests isolated from PostgreSQL.
 
@@ -1022,6 +1056,11 @@ They verify:
 * multi-field and case-insensitive search
 * numeric sorting
 * low-stock retrieval and individual-item exclusion
+* full-stack API search, sorting, low-stock filtering, and pagination
+* query composition across search/sort/pagination and low-stock/sort/pagination
+* literal handling of `%`, `_`, and `!` search characters
+* deterministic pagination when primary sort values tie
+* empty results when an offset exceeds the available rows
 * PostgreSQL tracking-mode constraints
 * migration of a frozen v0.5.0 schema without data loss
 
@@ -1210,13 +1249,6 @@ The console currently does not expose:
 * tracking-mode selection
 * tracking-mode transitions
 
-The API currently provides those tracking-mode operations, but it does not yet expose:
-
-* search queries
-* sorting options
-* low-stock retrieval
-* pagination
-
 The Docker local development setup does not yet include:
 
 * automatic migration execution for existing databases
@@ -1228,16 +1260,15 @@ These are future capabilities, not unfinished current-release work.
 
 ## Next Database Stage
 
-The v0.7.0 Docker-startup milestone is complete at the feature and lifecycle-verification level and is undergoing final release Lock.
+The v0.8.0 API-query milestone is complete at the feature and Tock-verification level and is undergoing final release Lock.
 
 Future database work should continue in bounded slices. Likely candidates include:
 
-* API search, sorting, low-stock, and pagination support
 * an automated migration runner and migration-history table
 * timestamps or audit-oriented fields when a concrete workflow requires them
 * Azure deployment planning after the local and CI paths remain stable
 
-The next slice should be selected through the project roadmap rather than introduced simultaneously. PostgreSQL should remain the source of truth, direct SQL should remain visible, and every schema change should include a tested upgrade path.
+The next slice should be selected through the project roadmap rather than introduced simultaneously. Azure deployment is the leading next direction after v0.8.0, but it should remain a bounded deployment-foundation slice rather than absorbing unrelated database or application features. PostgreSQL should remain the source of truth, direct SQL should remain visible, and every schema change should include a tested upgrade path.
 
 ## Possible Future Database Evolution
 
@@ -1420,7 +1451,7 @@ Before adding an index:
 3. estimate table size and write cost
 4. verify that the index is actually used
 
-The future search-oriented direction of HIT will require careful indexing, but premature indexing would add complexity without measurable benefit.
+The API now exposes search-oriented query patterns, but the current dataset remains too small to justify speculative indexing. Future indexing should follow measured query plans and actual scale rather than the mere existence of search endpoints.
 
 ## Guiding Principles
 
@@ -1562,4 +1593,22 @@ HIT v0.7.0 established:
 
 No database schema migration was required for v0.7.0.
 
-Future database work can focus on API query capabilities, automated migration tooling, timestamps, users, households, audit history, indexing based on measured need, and Azure deployment.
+## v0.8.0 API Query Capabilities Milestone
+
+HIT v0.8.0 established:
+
+* literal case-insensitive API search across name, category, and location
+* approved API sorting by name, category, location, and quantity
+* low-stock API filtering that preserves quantity-tracking domain rules
+* optional bounded `limit` / `offset` pagination
+* backward-compatible unpaginated listing when `limit` is omitted
+* parameterized PostgreSQL pagination values
+* stable item-ID tie-breaking for deterministic sorted pagination
+* explicit rejection of blank search, unsupported sorting, invalid pagination ranges, and unsupported search/low-stock composition
+* integration proof that `%`, `_`, and `!` remain literal search characters
+* full-stack query-composition tests across FastAPI, service, repository, and PostgreSQL layers
+* a complete automated suite of 105 passing tests before final Lock verification
+
+No database schema migration was required for v0.8.0. The release extended the API and query path over the existing PostgreSQL model rather than changing the data model.
+
+Future database work can focus on Azure deployment foundations, automated migration tooling, timestamps, users, households, audit history, and indexing based on measured need.

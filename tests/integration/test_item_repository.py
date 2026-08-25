@@ -92,6 +92,15 @@ def test_searches_multiple_fields_and_sorts_numerically():
         item["quantity"] for item in sorted_items
     ] == [2, 10]
 
+    searched_and_sorted_items = search_items(
+        "i",
+        "quantity",
+    )
+
+    assert [
+        item["quantity"] for item in searched_and_sorted_items
+    ] == [2, 10]
+
 
 def test_returns_items_at_or_below_minimum_quantity():
     """Verify PostgreSQL applies the low-stock rule."""
@@ -241,3 +250,334 @@ def test_update_item_switches_to_individual_tracking():
     assert updated_item["tracking_mode"] == "individual"
     assert updated_item["quantity"] is None
     assert updated_item["minimum_quantity"] is None
+
+
+def test_get_all_items_supports_limit_and_offset():
+    """Verify deterministic limit/offset pagination."""
+
+    for name in [
+        "Apples",
+        "Bananas",
+        "Carrots",
+        "Dates",
+    ]:
+        create_item(
+            name=name,
+            category="Food",
+            location="Pantry",
+            quantity=1,
+            minimum_quantity=0,
+            notes="",
+        )
+
+    first_page = get_all_items(
+        "name",
+        limit=2,
+        offset=0,
+    )
+
+    second_page = get_all_items(
+        "name",
+        limit=2,
+        offset=2,
+    )
+
+    assert [
+        item["name"]
+        for item in first_page
+    ] == [
+        "Apples",
+        "Bananas",
+    ]
+
+    assert [
+        item["name"]
+        for item in second_page
+    ] == [
+        "Carrots",
+        "Dates",
+    ]
+
+
+def test_search_items_supports_limit_and_offset():
+    """Verify search results support deterministic pagination."""
+
+    for name in [
+        "Rice one",
+        "Rice two",
+        "Rice three",
+        "Rice four",
+    ]:
+        create_item(
+            name=name,
+            category="Food",
+            location="Pantry",
+            quantity=1,
+            minimum_quantity=0,
+            notes="",
+        )
+
+    first_page = search_items(
+        "rice",
+        limit=2,
+        offset=0,
+    )
+
+    second_page = search_items(
+        "rice",
+        limit=2,
+        offset=2,
+    )
+
+    assert [
+        item["name"]
+        for item in first_page
+    ] == [
+        "Rice four",
+        "Rice one",
+    ]
+
+    assert [
+        item["name"]
+        for item in second_page
+    ] == [
+        "Rice three",
+        "Rice two",
+    ]
+
+
+def test_low_stock_items_support_limit_and_offset():
+    """Verify low-stock results support deterministic pagination."""
+
+    for name, quantity in [
+        ("Item A", 1),
+        ("Item B", 2),
+        ("Item C", 3),
+        ("Item D", 4),
+    ]:
+        create_item(
+            name=name,
+            category="Testing",
+            location="Storage",
+            quantity=quantity,
+            minimum_quantity=10,
+            notes="",
+        )
+
+    first_page = get_low_stock_items(
+        "name",
+        limit=2,
+        offset=0,
+    )
+
+    second_page = get_low_stock_items(
+        "name",
+        limit=2,
+        offset=2,
+    )
+
+    assert [
+        item["name"]
+        for item in first_page
+    ] == [
+        "Item A",
+        "Item B",
+    ]
+
+    assert [
+        item["name"]
+        for item in second_page
+    ] == [
+        "Item C",
+        "Item D",
+    ]
+
+
+def test_search_items_treats_percent_as_literal():
+    """Verify percent signs are escaped instead of acting as wildcards."""
+
+    create_item(
+        name="Battery 50%",
+        category="Supplies",
+        location="Drawer",
+        quantity=1,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    create_item(
+        name="Battery full",
+        category="Supplies",
+        location="Drawer",
+        quantity=1,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    create_item(
+        name="Rice",
+        category="Food",
+        location="Pantry",
+        quantity=1,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    results = search_items("%")
+
+    assert [
+        item["name"]
+        for item in results
+    ] == [
+        "Battery 50%",
+    ]
+
+
+def test_search_items_treats_underscore_as_literal():
+    """Verify underscores are escaped instead of acting as wildcards."""
+
+    create_item(
+        name="Box_A",
+        category="Storage",
+        location="Garage",
+        quantity=1,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    create_item(
+        name="BoxXA",
+        category="Storage",
+        location="Garage",
+        quantity=1,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    results = search_items("_")
+
+    assert [
+        item["name"]
+        for item in results
+    ] == [
+        "Box_A",
+    ]
+
+
+def test_search_items_treats_escape_character_as_literal():
+    """Verify the SQL escape character can itself be searched literally."""
+
+    create_item(
+        name="Important!",
+        category="Notes",
+        location="Desk",
+        quantity=1,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    create_item(
+        name="Important",
+        category="Notes",
+        location="Desk",
+        quantity=1,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    results = search_items("!")
+
+    assert [
+        item["name"]
+        for item in results
+    ] == [
+        "Important!",
+    ]
+
+
+def test_get_all_items_uses_id_as_sort_tie_breaker():
+    """Verify pagination remains deterministic when sort values tie."""
+
+    first = create_item(
+        name="Alpha",
+        category="Testing",
+        location="Shelf",
+        quantity=5,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    second = create_item(
+        name="Beta",
+        category="Testing",
+        location="Shelf",
+        quantity=5,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    third = create_item(
+        name="Gamma",
+        category="Testing",
+        location="Shelf",
+        quantity=5,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    first_page = get_all_items(
+        "quantity",
+        limit=2,
+        offset=0,
+    )
+
+    second_page = get_all_items(
+        "quantity",
+        limit=2,
+        offset=2,
+    )
+
+    assert [
+        item["id"]
+        for item in first_page
+    ] == [
+        first["id"],
+        second["id"],
+    ]
+
+    assert [
+        item["id"]
+        for item in second_page
+    ] == [
+        third["id"],
+    ]
+
+
+def test_get_all_items_returns_empty_when_offset_exceeds_results():
+    """Verify pagination returns an empty result beyond the final page."""
+
+    create_item(
+        name="Apples",
+        category="Food",
+        location="Pantry",
+        quantity=1,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    create_item(
+        name="Bananas",
+        category="Food",
+        location="Pantry",
+        quantity=1,
+        minimum_quantity=0,
+        notes="",
+    )
+
+    results = get_all_items(
+        "name",
+        limit=10,
+        offset=100,
+    )
+
+    assert results == []
