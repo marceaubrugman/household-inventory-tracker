@@ -2,7 +2,7 @@
 
 A Python, PostgreSQL, FastAPI, and Docker household inventory application with both a console interface and a REST API, built with a layered backend architecture.
 
-**Current release: v0.8.0**
+**Current release: v0.9.0**
 
 ## Overview
 
@@ -18,6 +18,7 @@ The project is being developed incrementally as a practical Python data and back
 * **v0.6.0:** Added quantity and individual tracking modes with PostgreSQL migrations, database constraints, API validation, and full-stack test coverage
 * **v0.7.0:** Added reproducible Docker startup with PostgreSQL and API health checks, readiness-based startup ordering, and automatic first-run schema initialization
 * **v0.8.0:** Added API inventory querying with literal case-insensitive search, approved sorting, low-stock filtering, and bounded pagination
+* **v0.9.0:** Added an Azure deployment foundation using Azure Container Apps, Azure Container Registry, managed identity, and Azure Database for PostgreSQL Flexible Server, with secret-based database configuration and verified failure recovery
 
 HIT now demonstrates:
 
@@ -25,6 +26,7 @@ HIT now demonstrates:
 * a documented REST API with validated CRUD endpoints
 * a shared PostgreSQL-backed data-access layer
 * a reproducible local development environment using Docker Compose
+* an Azure deployment foundation using Container Apps, Container Registry, managed identity, and Azure Database for PostgreSQL Flexible Server
 * automated GitHub Actions checks for Python behavior, PostgreSQL integration, and Docker image builds
 
 ## Features
@@ -183,6 +185,48 @@ db service
    ↓
 PostgreSQL 18
 ```
+
+### Azure deployment path
+
+HIT v0.9.0 adds a bounded Azure deployment foundation while preserving the existing application architecture.
+
+```text
+Internet
+   ↓
+HTTPS
+   ↓
+Azure Container Apps
+   ↓
+FastAPI / Uvicorn
+   ↓
+item_service.py
+   ↓
+item_repository.py
+   ↓
+database.py
+   ↓
+Azure Database for PostgreSQL Flexible Server
+```
+
+The FastAPI application runs as a container in Azure Container Apps. The image is stored privately in Azure Container Registry.
+
+A user-assigned managed identity allows the Container App to pull the private image from Azure Container Registry without storing registry credentials.
+
+The application continues to receive its database connection through the existing `DATABASE_URL` contract. In Azure, the connection string is stored as a Container Apps secret and exposed to the container through a secret-referenced environment variable.
+
+The v0.9.0 learning deployment uses:
+
+* Azure Container Apps with external HTTPS ingress
+* Azure Container Registry for the private application image
+* a user-assigned managed identity with the `AcrPull` role
+* Azure Database for PostgreSQL Flexible Server
+* PostgreSQL password authentication
+* TLS-required database connections
+* Container Apps secrets for `DATABASE_URL`
+* a Consumption workload profile with scale-to-zero
+* separate `/health` liveness and `/db-health` dependency-health endpoints
+
+The Azure deployment deliberately remains a learning foundation rather than a production-hardened architecture. Private networking, fixed outbound egress, Key Vault, high availability, multi-region deployment, advanced monitoring, and infrastructure as code remain outside v0.9.0 scope.
 
 FastAPI does not connect directly to PostgreSQL. API requests pass through Python application, service, repository, and database layers. SQL remains isolated inside `item_repository.py`.
 
@@ -421,6 +465,15 @@ HIT includes several defensive programming, testing, and local-development pract
 * `.env` ignored by Git
 * `.env.example` committed as a safe local-development template
 * connection timeout handling
+* private Azure Container Registry image storage
+* managed-identity authentication for Azure Container Registry image pulls
+* secret-referenced `DATABASE_URL` configuration in Azure Container Apps
+* TLS-required Azure PostgreSQL connections
+* separate application liveness and database-dependency health checks
+* verified graceful degradation during PostgreSQL network failure
+* verified graceful degradation when database configuration is missing
+* verified recovery without loss of persisted PostgreSQL data
+* Azure Container Apps revision-based configuration changes
 * controlled `404`, `422`, and `503` API responses
 * safe public database-error messages
 * server-side logging of PostgreSQL operational failures
@@ -526,6 +579,10 @@ household-inventory-tracker/
 * pgAdmin 4
 * Git and GitHub
 * GitHub Actions
+* Azure Container Apps
+* Azure Container Registry
+* Azure Database for PostgreSQL Flexible Server
+* Azure managed identity
 
 ## Requirements
 
@@ -1036,8 +1093,11 @@ A single table remains intentional at this stage, keeping the domain model under
 * no browser frontend
 * no audit or stock-movement history
 * no continuous deployment pipeline yet
-* no production deployment
-* Docker setup is intended for local development only
+* Azure deployment exists as a learning/deployment foundation, but is not yet production-hardened
+* Azure PostgreSQL networking currently uses the broad Azure-services firewall rule rather than private networking or fixed egress
+* no infrastructure-as-code deployment
+* no centralized production observability or alerting
+* Docker Compose remains the local development model rather than the production deployment model
 
 These limitations define later iterations rather than unfinished current-release work.
 
@@ -1052,11 +1112,27 @@ Planned future work includes:
 * users and households
 * authentication and authorization
 * audit and stock-movement history
-* Azure deployment
+* Azure deployment hardening, including private networking, predictable egress, observability, and infrastructure as code when justified
 
 Features will continue to be added incrementally to preserve architectural clarity.
 
 ## Version History
+
+### v0.9.0
+
+* deployed the FastAPI container to Azure Container Apps
+* stored the application image privately in Azure Container Registry
+* used a user-assigned managed identity with `AcrPull` for registry access
+* deployed PostgreSQL through Azure Database for PostgreSQL Flexible Server
+* preserved the existing `DATABASE_URL` application configuration contract
+* stored the Azure database connection as a Container Apps secret
+* enabled public HTTPS ingress while keeping PostgreSQL behind firewall rules
+* verified public API creation, retrieval, and persistence through Azure
+* verified persisted data survives Container App revision restart
+* verified graceful degradation during PostgreSQL network loss
+* verified graceful degradation when `DATABASE_URL` is absent
+* verified recovery after both induced failure modes
+* preserved the existing PostgreSQL schema and application behavior without introducing Azure-specific Python database code
 
 ### v0.8.0
 
@@ -1180,4 +1256,4 @@ GitHub: [marceaubrugman](https://github.com/marceaubrugman)
 
 ## Status
 
-HIT v0.8.0 is a PostgreSQL-backed inventory application with console and FastAPI interfaces, separate quantity and individual tracking modes, validated CRUD operations, API search, approved sorting, low-stock filtering, bounded pagination, reproducible Docker startup, sequential schema migrations, database-enforced domain rules, and GitHub Actions CI covering Python behavior, PostgreSQL integration, and Docker image builds.
+HIT v0.9.0 is a PostgreSQL-backed inventory application with console and FastAPI interfaces, separate quantity and individual tracking modes, validated CRUD operations, API search, approved sorting, low-stock filtering, bounded pagination, reproducible Docker startup, sequential schema migrations, database-enforced domain rules, GitHub Actions CI, and a verified Azure deployment foundation using Azure Container Apps, Azure Container Registry, managed identity, and Azure Database for PostgreSQL Flexible Server.
