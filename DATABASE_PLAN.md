@@ -13,6 +13,7 @@ It records:
 * how v0.6.0 introduced quantity and individual tracking modes through sequential PostgreSQL migrations
 * how v0.7.0 made Docker startup reproducible through service health checks, readiness-based startup ordering, and automatic first-run schema initialization
 * how v0.8.0 exposed secure API query capabilities through search, approved sorting, low-stock filtering, and bounded pagination
+* how v0.9.0 deployed the unchanged PostgreSQL-backed application model to Azure Database for PostgreSQL Flexible Server and verified cloud persistence, secret-based configuration, and dependency-failure recovery
 * the responsibilities of the database, repository, service, and interface layers
 * current security, validation, migration, and integrity decisions
 * the migration path from the legacy JSON format
@@ -22,7 +23,7 @@ The current database model remains intentionally focused. It supports quantity-t
 
 ## Current Status
 
-**Implemented through HIT v0.8.0**
+**Implemented through HIT v0.9.0**
 
 PostgreSQL is the primary source of truth for inventory data.
 
@@ -48,6 +49,21 @@ HIT can run PostgreSQL in two local development modes:
 
 * manually managed PostgreSQL using a local `DATABASE_URL`
 * Docker Compose PostgreSQL using the `db` service and local `.env` configuration
+
+HIT v0.9.0 also runs against Azure Database for PostgreSQL Flexible Server.
+
+The Azure deployment preserves the same database abstraction used locally: the application continues to read a standard PostgreSQL connection string from `DATABASE_URL`. No Azure-specific database logic was added to the Python application.
+
+In Azure:
+
+* PostgreSQL remains the persistent source of truth
+* the existing `sql/schema.sql` initializes the application schema
+* `DATABASE_URL` is stored as a Container Apps secret
+* the FastAPI container receives that secret through an environment-variable reference
+* the PostgreSQL connection requires TLS
+* database availability is reported separately from API liveness through `/db-health`
+
+No schema migration was required for v0.9.0.
 
 Docker Compose is intended for reproducible local development. In v0.7.0, PostgreSQL gained a Docker health check, the API waits for PostgreSQL to become healthy before startup, the API gained its own Docker health check, and a fresh PostgreSQL volume automatically applies `sql/schema.sql` through `/docker-entrypoint-initdb.d/`. Existing volumes skip initialization and preserve their data. These changes do not alter PostgreSQL’s role as the source of truth or move SQL out of the repository layer.
 
@@ -110,6 +126,30 @@ db service
    ↓
 PostgreSQL 18
 ```
+
+### Azure deployment path
+
+```text
+Internet
+   ↓
+HTTPS
+   ↓
+Azure Container Apps
+   ↓
+FastAPI / Uvicorn
+   ↓
+API routers and dependencies
+   ↓
+item_service.py
+   ↓
+item_repository.py
+   ↓
+database.py
+   ↓
+Azure Database for PostgreSQL Flexible Server
+```
+
+The Azure-hosted application keeps the same repository and connection layers as local development. Container Apps injects `DATABASE_URL` through a secret reference, and the connection string requires TLS. The application image is pulled from Azure Container Registry through a user-assigned managed identity.
 
 The console and FastAPI interfaces use the same PostgreSQL schema, repository functions, and connection layer.
 
@@ -189,6 +229,28 @@ localhost
 
 The Docker Compose PostgreSQL data is persisted in a named Docker volume.
 
+### Azure PostgreSQL database
+
+```text
+hit
+```
+
+Used by:
+
+* the FastAPI application running in Azure Container Apps
+* Azure deployment smoke and persistence testing
+* the `/db-health` dependency-health endpoint in the Azure deployment
+
+The connection string is provided through the same application contract:
+
+```text
+DATABASE_URL
+```
+
+In Azure, the value is stored as a Container Apps secret and referenced by the container environment. The connection requires TLS. PostgreSQL public network access is enabled for the v0.9.0 learning deployment, with firewall rules controlling allowed network sources.
+
+The current Azure networking model is intentionally bounded to the learning release. Private networking and predictable fixed egress remain later hardening work.
+
 ### Integration-test database
 
 ```text
@@ -260,7 +322,7 @@ CREATE TABLE IF NOT EXISTS hit.items (
 );
 ```
 
-The standalone schema represents the final v0.6.0 database model and remains unchanged through v0.8.0. Fresh Docker environments now apply this schema automatically. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
+The standalone schema represents the final v0.6.0 database model and remains unchanged through v0.9.0. Fresh Docker environments now apply this schema automatically. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
 
 ## Field Definitions
 
@@ -790,7 +852,14 @@ For Docker Compose local development:
 * `.env` is ignored by Git
 * `.env` is not copied into the Docker image
 
-Real connection strings remain in local environment variables, local `.env` files, or PyCharm run configurations and are excluded from Git.
+For the Azure deployment:
+
+* the PostgreSQL connection string is stored as a Container Apps secret
+* `DATABASE_URL` references that secret at runtime
+* the real connection string is not committed to Git
+* Azure Container Registry image pulls use managed identity rather than stored registry credentials
+
+Real connection strings remain in local environment variables, local `.env` files, PyCharm run configurations, or Azure secret storage and are excluded from Git.
 
 ### Connection timeout
 
@@ -977,7 +1046,7 @@ If any database operation fails, the complete migration is rolled back.
 
 ## Testing Strategy
 
-The current suite contains 105 passing automated tests before final v0.8.0 Lock verification. v0.8.0 expanded repository, service, API, and full-stack integration coverage for query parameters, composition, literal wildcard handling, deterministic pagination, and edge cases while preserving the v0.7.0 Docker lifecycle behavior.
+The current suite contains 105 passing automated tests before final v0.9.0 Lock verification. v0.9.0 does not add application behavior or change the PostgreSQL schema, so the existing suite remains the regression baseline while release-level Azure checks add deployment, persistence, and failure-recovery evidence.
 
 ## Unit and service tests
 
@@ -1238,7 +1307,9 @@ The current database model does not yet support:
 * full-text search
 * semantic search
 * trusted-successor access
-* production deployment
+* production-grade private database networking
+* predictable Azure Container Apps outbound egress
+* centralized production database observability and alerting
 * automated migration execution
 * migration-history tracking
 * automated rollback procedures
@@ -1260,15 +1331,16 @@ These are future capabilities, not unfinished current-release work.
 
 ## Next Database Stage
 
-The v0.8.0 API-query milestone is complete at the feature and Tock-verification level and is undergoing final release Lock.
+The v0.9.0 Azure deployment foundation preserves the existing PostgreSQL model and database-access contract without introducing a schema migration.
 
-Future database work should continue in bounded slices. Likely candidates include:
+Future database work should remain requirement-driven. Likely candidates include:
 
 * an automated migration runner and migration-history table
 * timestamps or audit-oriented fields when a concrete workflow requires them
-* Azure deployment planning after the local and CI paths remain stable
+* users and households when multi-user behavior becomes active
+* stronger Azure networking when the deployment moves beyond the learning foundation
 
-The next slice should be selected through the project roadmap rather than introduced simultaneously. Azure deployment is the leading next direction after v0.8.0, but it should remain a bounded deployment-foundation slice rather than absorbing unrelated database or application features. PostgreSQL should remain the source of truth, direct SQL should remain visible, and every schema change should include a tested upgrade path.
+PostgreSQL remains the source of truth, direct SQL remains visible, and every future schema change should include a tested upgrade path.
 
 ## Possible Future Database Evolution
 
@@ -1409,17 +1481,29 @@ Future CI improvements may include:
 
 CI should continue to complement, not replace, local testing discipline.
 
-### Azure deployment
+### Azure deployment foundation
 
-A later production direction may use:
+HIT v0.9.0 now uses:
 
-* Azure Database for PostgreSQL
-* Azure Container Apps or App Service
-* managed secrets
-* database backups
-* monitoring
-* private networking
+* Azure Database for PostgreSQL Flexible Server
+* Azure Container Apps for the FastAPI container
+* Azure Container Registry for private image storage
+* a user-assigned managed identity for `AcrPull`
+* Container Apps secrets for `DATABASE_URL`
+* TLS-required PostgreSQL connectivity
+* public HTTPS ingress for the API
+* PostgreSQL firewall rules for network access
+
+The current deployment is intentionally a learning foundation rather than a production-hardened topology.
+
+Later hardening may include:
+
+* private database networking
+* predictable outbound egress
+* centralized logging, monitoring, and alerting
+* explicit backup and recovery requirements
 * production migration procedures
+* infrastructure as code
 
 ## Indexing Considerations
 
@@ -1611,4 +1695,22 @@ HIT v0.8.0 established:
 
 No database schema migration was required for v0.8.0. The release extended the API and query path over the existing PostgreSQL model rather than changing the data model.
 
-Future database work can focus on Azure deployment foundations, automated migration tooling, timestamps, users, households, audit history, and indexing based on measured need.
+## v0.9.0 Azure Deployment Foundation Milestone
+
+HIT v0.9.0 established:
+
+* Azure Database for PostgreSQL Flexible Server as a cloud-hosted PostgreSQL runtime
+* reuse of the existing PostgreSQL schema without migration
+* reuse of the existing `DATABASE_URL` application contract
+* TLS-required database connectivity
+* secret-based database configuration through Azure Container Apps
+* separation of API liveness from database dependency health
+* public end-to-end persistence proof through the Azure-hosted API
+* persistence across Container App revision restart
+* controlled `503` behavior during PostgreSQL network failure
+* controlled `503` behavior when database configuration is absent
+* successful recovery after both induced failure conditions
+
+No PostgreSQL schema migration was required for v0.9.0. The release changes deployment topology rather than the inventory data model.
+
+Future database work can focus on automated migration tooling, timestamps, users, households, audit history, measured indexing needs, and Azure deployment hardening when product requirements justify it.

@@ -16,6 +16,8 @@ The project is developed incrementally. Each release should:
 
 **Stable release: v0.8.0**
 
+**Release candidate in Lock: v0.9.0**
+
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
 * a menu-driven console application
@@ -42,9 +44,16 @@ The current implementation includes:
 * readiness-based API startup after PostgreSQL becomes healthy
 * automatic first-run schema initialization for fresh Docker volumes
 * `.env.example` for local Docker configuration
+* Azure Container Apps deployment with public HTTPS ingress
+* private Azure Container Registry image storage
+* user-assigned managed identity with least-privilege `AcrPull`
+* Azure Database for PostgreSQL Flexible Server
+* secret-referenced Azure `DATABASE_URL` configuration with TLS-required database connectivity
+* verified Azure persistence across Container App restart
+* verified graceful degradation for PostgreSQL network loss and missing database configuration
 * GitHub Actions checks for Python tests, PostgreSQL integration tests, and Docker image builds
 * unit, API, service, migration, repository, and full-stack PostgreSQL integration tests
-* 105 passing automated tests before final v0.8.0 Lock verification
+* 105 passing automated tests before final v0.9.0 Lock verification
 
 PostgreSQL remains the application’s source of truth.
 
@@ -52,7 +61,7 @@ The JSON runtime used in v0.1.0 has been removed. JSON remains supported only as
 
 Docker Compose starts the FastAPI API service and a PostgreSQL 18 database service together for reproducible local development.
 
-The v0.8.0 Tick and Tock work are complete on `feature/api-search-query`. Pre-Lock documentation and final Lock verification are in progress.
+The v0.9.0 Tick and Tock work are complete on `feature/azure-deployment-foundation`. Release Lock is in progress.
 
 ## Current Architecture
 
@@ -103,6 +112,28 @@ db service
    ↓
 PostgreSQL 18
 ```
+
+### Azure deployment path
+
+```text
+Internet
+   ↓
+HTTPS
+   ↓
+Azure Container Apps
+   ↓
+FastAPI / Uvicorn
+   ↓
+item_service.py
+   ↓
+item_repository.py
+   ↓
+database.py
+   ↓
+Azure Database for PostgreSQL Flexible Server
+```
+
+The Azure-hosted API pulls its private image from Azure Container Registry through a user-assigned managed identity with `AcrPull`. The application reuses the existing `DATABASE_URL` contract through a Container Apps secret reference, so the Python database layer remains Azure-agnostic.
 
 FastAPI does not connect directly to PostgreSQL. API requests pass through Python application, service, repository, and database layers.
 
@@ -795,7 +826,7 @@ A developer should be able to clone the repository, configure `.env`, run Docker
 
 ---
 
-# Current Release Milestone
+# Completed Release Milestone
 
 ## v0.8.0: API Query Capabilities
 
@@ -873,6 +904,82 @@ Expose HIT's useful inventory query behavior through the FastAPI interface while
 * [x] No PostgreSQL schema migration
 * [x] Existing Docker startup behavior preserved
 * [x] Existing console behavior preserved
+
+---
+
+# Current Release Milestone
+
+## v0.9.0: Azure Deployment Foundation
+
+### Goal
+
+Deploy the existing PostgreSQL-backed HIT API to Azure without changing its core application architecture, while establishing secure image delivery, managed cloud PostgreSQL, secret-based configuration, health verification, persistence proof, and controlled failure recovery.
+
+### Tick
+
+* [x] Create the Azure resource group
+* [x] Create Azure Container Registry
+* [x] Build and push the HIT container image
+* [x] Deploy Azure Database for PostgreSQL Flexible Server
+* [x] Apply the existing HIT schema to Azure PostgreSQL
+* [x] Verify local HIT can use Azure PostgreSQL through the existing `DATABASE_URL`
+* [x] Create the Azure Container Apps environment
+* [x] Create a user-assigned managed identity
+* [x] Grant least-privilege `AcrPull` access to the registry
+* [x] Deploy HIT to Azure Container Apps
+* [x] Configure external HTTPS ingress
+* [x] Configure scale-to-zero with a single maximum replica
+* [x] Store the Azure PostgreSQL connection string as a Container Apps secret
+* [x] Reference the secret through `DATABASE_URL`
+* [x] Verify `/health`
+* [x] Verify `/db-health`
+* [x] Create and retrieve inventory through the public Azure API
+* [x] Restart the Container App revision and verify PostgreSQL persistence
+
+### Tock
+
+* [x] Remove PostgreSQL network access and verify `/health` remains available
+* [x] Verify database-dependent endpoints return controlled `503` responses during the network failure
+* [x] Restore PostgreSQL network access and verify recovery
+* [x] Remove `DATABASE_URL` and verify application liveness remains healthy
+* [x] Verify database-dependent endpoints return controlled `503` responses when configuration is missing
+* [x] Restore the secret reference and verify recovery
+* [x] Verify persisted inventory survives both failure exercises
+
+### Lock
+
+* [x] Freeze v0.9.0 feature scope
+* [x] Verify branch, commit, remote-main, and Azure runtime baseline
+* [x] Align application and Docker Compose version identifiers
+* [x] Update README, backlog, and database-plan documentation
+* [x] Run dependency, compile, test, and whitespace checks
+* [x] Run final local Docker verification
+* [ ] Build the final commit-SHA-tagged Azure image
+* [ ] Deploy the exact release candidate image to Azure
+* [ ] Run final Azure health and persistence proof
+* [x] Verify tracked files contain no credentials or private data
+* [ ] Commit and push the release candidate
+* [ ] Open and review the v0.9.0 pull request
+* [ ] Confirm GitHub Actions passes
+* [ ] Merge into `main`
+* [ ] Rerun release verification on exact `main`
+* [ ] Create and push the annotated `v0.9.0` tag
+* [ ] Publish the GitHub Release
+
+### Scope guardrails preserved
+
+* [x] No application authentication
+* [x] No frontend
+* [x] No PostgreSQL schema migration
+* [x] No private VNet architecture
+* [x] No NAT Gateway or fixed egress
+* [x] No Key Vault
+* [x] No high availability or multi-region deployment
+* [x] No Terraform or Bicep
+* [x] No Kubernetes
+* [x] No major CI/CD redesign
+* [x] Existing local Docker Compose workflow preserved
+* [x] Existing application/database layering preserved
 
 ---
 
@@ -966,17 +1073,29 @@ The first explicit SQL migrations were introduced in v0.6.0. More tooling should
 * [ ] Add audit queries
 * [ ] Add tests for history integrity
 
-## Azure deployment
+## Azure deployment hardening
 
-* [ ] Complete Azure Fundamentals preparation
-* [ ] Select the initial Azure hosting service
-* [ ] Deploy the PostgreSQL-backed API
-* [ ] Configure managed secrets
-* [ ] Configure environment variables
-* [ ] Add production health checks
-* [ ] Configure logging and monitoring
-* [ ] Document deployment
-* [ ] Review backup and recovery options
+Completed in v0.9.0:
+
+* [x] Complete the Azure Fundamentals learning path needed for the deployment
+* [x] Select Azure Container Apps as the initial API hosting service
+* [x] Deploy the PostgreSQL-backed API
+* [x] Use Azure Container Registry for private image storage
+* [x] Use managed identity for private image pull
+* [x] Configure managed secrets and environment variables
+* [x] Deploy Azure Database for PostgreSQL Flexible Server
+* [x] Verify liveness, dependency health, persistence, and failure recovery
+* [x] Document the deployment architecture and its current security boundaries
+
+Later:
+
+* [ ] Introduce private database networking when production requirements justify it
+* [ ] Introduce predictable outbound egress
+* [ ] Add centralized logging, monitoring, and alerting
+* [ ] Review backup and recovery requirements
+* [ ] Define production availability requirements
+* [ ] Introduce infrastructure as code
+* [ ] Automate deployment only after the manual deployment model is understood
 
 ## AI-assisted capabilities
 
@@ -1019,8 +1138,6 @@ The first explicit SQL migrations were introduced in v0.6.0. More tooling should
 
 # Immediate Next Action
 
-HIT v0.8.0 is fully closed.
+HIT v0.9.0 Tick and Tock are complete and release Lock is in progress.
 
-Begin v0.9.0 planning by reading the canonical v0.8.0 → v0.9.0 handover and the Living Learning Library, then apply the roadmap activation gate before selecting the next release objective.
-
-Azure deployment foundation is the leading candidate, but it must earn activation through that gate rather than being assumed automatically.
+Run Lock verification: dependency integrity, Python compilation, the complete automated test suite, whitespace checks, and final local Docker proof. Then build and deploy the exact release-candidate image before the pull request, merge, tag, and GitHub Release steps.
