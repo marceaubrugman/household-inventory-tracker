@@ -14,9 +14,7 @@ The project is developed incrementally. Each release should:
 
 ## Current Status
 
-**Stable release: v0.8.0**
-
-**Release candidate in Lock: v0.9.0**
+**Stable release: v0.9.0**
 
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
@@ -954,17 +952,17 @@ Deploy the existing PostgreSQL-backed HIT API to Azure without changing its core
 * [x] Update README, backlog, and database-plan documentation
 * [x] Run dependency, compile, test, and whitespace checks
 * [x] Run final local Docker verification
-* [ ] Build the final commit-SHA-tagged Azure image
-* [ ] Deploy the exact release candidate image to Azure
-* [ ] Run final Azure health and persistence proof
+* [x] Build the final commit-SHA-tagged Azure image
+* [x] Deploy the exact release candidate image to Azure
+* [x] Run final Azure health and persistence proof
 * [x] Verify tracked files contain no credentials or private data
-* [ ] Commit and push the release candidate
-* [ ] Open and review the v0.9.0 pull request
-* [ ] Confirm GitHub Actions passes
-* [ ] Merge into `main`
-* [ ] Rerun release verification on exact `main`
-* [ ] Create and push the annotated `v0.9.0` tag
-* [ ] Publish the GitHub Release
+* [x] Commit and push the release candidate
+* [x] Open and review the v0.9.0 pull request
+* [x] Confirm GitHub Actions passes
+* [x] Merge into `main`
+* [x] Rerun release verification on exact `main`
+* [x] Create and push the annotated `v0.9.0` tag
+* [x] Publish the GitHub Release
 
 ### Scope guardrails preserved
 
@@ -1138,6 +1136,6 @@ Later:
 
 # Immediate Next Action
 
-HIT v0.9.0 Tick and Tock are complete and release Lock is in progress.
+HIT v0.9.0 is fully released.
 
-Run Lock verification: dependency integrity, Python compilation, the complete automated test suite, whitespace checks, and final local Docker proof. Then build and deploy the exact release-candidate image before the pull request, merge, tag, and GitHub Release steps.
+Complete the post-release close tail: record the release state, create the canonical v0.9.0 to v0.10.0 handover, update the Living Learning Library last, decide the Azure cost state, and clean up the merged feature branch.
