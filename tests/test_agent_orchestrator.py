@@ -6,6 +6,8 @@ import pytest
 from src.agent import orchestrator
 from src.agent.dispatcher import ToolRequestError
 
+import psycopg
+
 
 def fake_tool_call(name="search_items"):
     return SimpleNamespace(
@@ -355,3 +357,40 @@ def test_later_empty_search_preserves_earlier_matches(monkeypatch):
     assert "Dishwasher tablets, Eco" in answer
     assert "24" in answer
     assert "12" in answer
+
+
+
+def test_agent_database_outage_has_safe_error(monkeypatch):
+    """Database failures should not expose connection details."""
+
+    fake_client = SimpleNamespace(
+        responses=SimpleNamespace(
+            create=lambda **kwargs: fake_response([
+                fake_tool_call()
+            ])
+        )
+    )
+
+    def unavailable_database(name, arguments):
+        raise psycopg.OperationalError(
+            "Sensitive database connection details"
+        )
+
+    monkeypatch.setattr(
+        orchestrator,
+        "dispatch_read_tool",
+        unavailable_database,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Inventory data is temporarily unavailable.",
+    ) as error_info:
+        orchestrator.answer_inventory_question(
+            "How many dishwasher tablets do we have?",
+            fake_client,
+        )
+
+    assert "Sensitive database" not in str(
+        error_info.value
+    )

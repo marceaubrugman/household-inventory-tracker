@@ -9,6 +9,10 @@ from openai import OpenAI
 from src.agent.dispatcher import dispatch_read_tool
 from src.agent.tool_schemas import READ_TOOL_SCHEMAS
 
+import psycopg
+
+from src.database import DatabaseConfigurationError
+
 
 MODEL = "gpt-5.6-luna"
 MAX_MODEL_REQUESTS = 3
@@ -66,6 +70,10 @@ def format_multiple_matches(
         )
 
     return "\n".join(lines)
+
+
+class InventoryUnavailableError(RuntimeError):
+    """Inventory data cannot currently be retrieved."""
 
 
 def answer_inventory_question(
@@ -152,10 +160,19 @@ def answer_inventory_question(
 
         call = tool_calls[0]
 
-        result = dispatch_read_tool(
-            call.name,
-            call.arguments,
-        )
+
+        try:
+            result = dispatch_read_tool(
+                call.name,
+                call.arguments,
+            )
+        except (
+            DatabaseConfigurationError,
+            psycopg.OperationalError,
+        ):
+            raise InventoryUnavailableError(
+                "Inventory data is temporarily unavailable."
+            ) from None
 
         used_tool = True
 
