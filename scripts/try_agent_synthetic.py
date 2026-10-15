@@ -7,16 +7,31 @@ from src.agent import tools
 from src.agent.orchestrator import answer_inventory_question
 
 
-DEMO_ITEM = {
-    "id": 17,
-    "name": "Dishwasher tablets",
-    "category": "Cleaning",
-    "location": "Kitchen",
-    "tracking_mode": "quantity",
-    "quantity": 24,
-    "minimum_quantity": 5,
-    "notes": None,
-}
+
+DEMO_ITEMS = [
+    {
+        "id": 17,
+        "name": "Dishwasher tablets, Classic",
+        "category": "Cleaning",
+        "location": "Kitchen",
+        "tracking_mode": "quantity",
+        "quantity": 24,
+        "minimum_quantity": 5,
+        "notes": None,
+    },
+    {
+        "id": 18,
+        "name": "Dishwasher tablets, Eco",
+        "category": "Cleaning",
+        "location": "Kitchen",
+        "tracking_mode": "quantity",
+        "quantity": 12,
+        "minimum_quantity": 4,
+        "notes": None,
+    },
+]
+
+
 
 
 def demo_search(
@@ -25,13 +40,17 @@ def demo_search(
     limit: int | None = None,
     offset: int = 0,
 ) -> list[dict]:
-    """Simulate the existing inventory search service."""
+    """Search the synthetic inventory."""
+
     print(f"[DEMO SERVICE] Searching for {search_term!r}")
 
-    if search_term.casefold() in DEMO_ITEM["name"].casefold():
-        matches = [DEMO_ITEM.copy()]
-    else:
-        matches = []
+    matches = [
+        item.copy()
+        for item in DEMO_ITEMS
+        if search_term.casefold() in item["name"].casefold()
+    ]
+
+    print(f"[DEMO SERVICE] Found {len(matches)} item(s)")
 
     if limit is None:
         return matches[offset:]
@@ -40,11 +59,13 @@ def demo_search(
 
 
 def demo_find(item_id: int) -> dict | None:
-    """Simulate retrieving one inventory item."""
+    """Retrieve one synthetic inventory item."""
+
     print(f"[DEMO SERVICE] Getting item ID {item_id}")
 
-    if item_id == DEMO_ITEM["id"]:
-        return DEMO_ITEM.copy()
+    for item in DEMO_ITEMS:
+        if item["id"] == item_id:
+            return item.copy()
 
     return None
 

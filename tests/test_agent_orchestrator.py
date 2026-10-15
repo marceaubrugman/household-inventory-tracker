@@ -114,3 +114,164 @@ def test_agent_rejects_unapproved_tool():
             "Delete the dishwasher tablets",
             fake_client,
         )
+
+
+
+def test_missing_item_cannot_be_reported_as_zero(monkeypatch):
+    """An empty search must not become a false zero-stock claim."""
+
+    missing_item_call = SimpleNamespace(
+        type="function_call",
+        name="search_items",
+        arguments='{"query": "coffee filters"}',
+        call_id="call_missing",
+    )
+
+    responses = iter([
+        fake_response([missing_item_call]),
+        fake_response(
+            [],
+            "You have zero coffee filters.",
+        ),
+    ])
+
+    fake_client = SimpleNamespace(
+        responses=SimpleNamespace(
+            create=lambda **kwargs: next(responses)
+        )
+    )
+
+    def fake_dispatch(name, arguments):
+        assert name == "search_items"
+        return {
+            "matches": [],
+            "has_more": False,
+        }
+
+    monkeypatch.setattr(
+        orchestrator,
+        "dispatch_read_tool",
+        fake_dispatch,
+    )
+
+    answer = orchestrator.answer_inventory_question(
+        "How many coffee filters do we have?",
+        fake_client,
+    )
+
+    assert answer == (
+        "I couldn't find a matching item "
+        "in the recorded inventory."
+    )
+
+
+
+def test_multiple_matches_cannot_silently_choose_one(monkeypatch):
+    """The answer must not silently omit matching variations."""
+
+    responses = iter([
+        fake_response([fake_tool_call()]),
+        fake_response(
+            [],
+            "You have 24 Classic dishwasher tablets.",
+        ),
+    ])
+
+    fake_client = SimpleNamespace(
+        responses=SimpleNamespace(
+            create=lambda **kwargs: next(responses)
+        )
+    )
+
+    def fake_dispatch(name, arguments):
+        assert name == "search_items"
+
+        return {
+            "matches": [
+                {
+                    "id": 17,
+                    "name": "Dishwasher tablets, Classic",
+                    "tracking_mode": "quantity",
+                    "quantity": 24,
+                },
+                {
+                    "id": 18,
+                    "name": "Dishwasher tablets, Eco",
+                    "tracking_mode": "quantity",
+                    "quantity": 12,
+                },
+            ],
+            "has_more": False,
+        }
+
+    monkeypatch.setattr(
+        orchestrator,
+        "dispatch_read_tool",
+        fake_dispatch,
+    )
+
+    answer = orchestrator.answer_inventory_question(
+        "How many dishwasher tablets do we have?",
+        fake_client,
+    )
+
+    assert "Dishwasher tablets, Classic" in answer
+    assert "Dishwasher tablets, Eco" in answer
+    assert "24" in answer
+    assert "12" in answer
+
+
+
+def test_truncated_search_warns_about_more_matches(monkeypatch):
+    """Limited search results must not imply a complete inventory."""
+
+    responses = iter([
+        fake_response([fake_tool_call()]),
+        fake_response(
+            [],
+            "There are exactly five dishwasher tablet variations.",
+        ),
+    ])
+
+    fake_client = SimpleNamespace(
+        responses=SimpleNamespace(
+            create=lambda **kwargs: next(responses)
+        )
+    )
+
+    def fake_dispatch(name, arguments):
+        assert name == "search_items"
+
+        return {
+            "matches": [
+                {
+                    "id": number,
+                    "name": f"Dishwasher tablets, Variant {number}",
+                    "tracking_mode": "quantity",
+                    "quantity": number,
+                    "location": "Kitchen",
+                }
+                for number in range(1, 6)
+            ],
+            "has_more": True,
+        }
+
+    monkeypatch.setattr(
+        orchestrator,
+        "dispatch_read_tool",
+        fake_dispatch,
+    )
+
+    answer = orchestrator.answer_inventory_question(
+        "How many dishwasher tablet variations do we have?",
+        fake_client,
+    )
+
+    for number in range(1, 6):
+        assert (
+            f"Dishwasher tablets, Variant {number}: "
+            f"quantity {number}"
+        ) in answer
+
+    assert "More matches are available" in answer
+    assert "exactly five" not in answer.lower()
