@@ -275,3 +275,83 @@ def test_truncated_search_warns_about_more_matches(monkeypatch):
 
     assert "More matches are available" in answer
     assert "exactly five" not in answer.lower()
+
+
+
+def test_later_empty_search_preserves_earlier_matches(monkeypatch):
+    """A later empty search must not erase earlier evidence."""
+
+    first_call = SimpleNamespace(
+        type="function_call",
+        name="search_items",
+        arguments='{"query": "dishwasher tablets"}',
+        call_id="call_first",
+    )
+
+    second_call = SimpleNamespace(
+        type="function_call",
+        name="search_items",
+        arguments='{"query": "dishwasher powder"}',
+        call_id="call_second",
+    )
+
+    responses = iter([
+        fake_response([first_call]),
+        fake_response([second_call]),
+        fake_response(
+            [],
+            "You have zero dishwasher tablets.",
+        ),
+    ])
+
+    fake_client = SimpleNamespace(
+        responses=SimpleNamespace(
+            create=lambda **kwargs: next(responses)
+        )
+    )
+
+    def fake_dispatch(name, arguments):
+        assert name == "search_items"
+
+        if arguments == first_call.arguments:
+            return {
+                "matches": [
+                    {
+                        "id": 17,
+                        "name": "Dishwasher tablets, Classic",
+                        "tracking_mode": "quantity",
+                        "quantity": 24,
+                    },
+                    {
+                        "id": 18,
+                        "name": "Dishwasher tablets, Eco",
+                        "tracking_mode": "quantity",
+                        "quantity": 12,
+                    },
+                ],
+                "has_more": False,
+            }
+
+        if arguments == second_call.arguments:
+            return {
+                "matches": [],
+                "has_more": False,
+            }
+
+        raise AssertionError("Unexpected tool arguments")
+
+    monkeypatch.setattr(
+        orchestrator,
+        "dispatch_read_tool",
+        fake_dispatch,
+    )
+
+    answer = orchestrator.answer_inventory_question(
+        "How many dishwasher tablets do we have?",
+        fake_client,
+    )
+
+    assert "Dishwasher tablets, Classic" in answer
+    assert "Dishwasher tablets, Eco" in answer
+    assert "24" in answer
+    assert "12" in answer

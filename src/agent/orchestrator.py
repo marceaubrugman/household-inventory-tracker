@@ -160,14 +160,15 @@ def answer_inventory_question(
         used_tool = True
 
         if call.name == "search_items":
-            if result["matches"]:
+            matches = result["matches"]
+
+            if matches:
                 found_inventory_item = True
 
-            multiple_matches_result = (
-                result
-                if len(result["matches"]) > 1
-                else None
-            )
+                if len(matches) > 1:
+                    multiple_matches_result = result
+                else:
+                    multiple_matches_result = None
 
         if call.name == "get_item" and result["status"] == "found":
             found_inventory_item = True
