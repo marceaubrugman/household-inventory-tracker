@@ -5,6 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.item_service import search_inventory_items, find_inventory_item
 
+from src.agent import proposals
+
 
 MAX_SEARCH_RESULTS = 5
 
@@ -84,3 +86,30 @@ def get_item(item_id: int) -> dict[str, Any]:
             "minimum_quantity": item["minimum_quantity"],
         },
     }
+
+
+class ProposeConsumptionInput(BaseModel):
+    """Validate input for a consumption proposal."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    item_id: int = Field(gt=0, strict=True)
+    amount: int = Field(gt=0, strict=True)
+
+
+
+def propose_consumption(
+    item_id: int,
+    amount: int,
+) -> dict[str, Any]:
+    """Return a validated draft without modifying inventory."""
+
+    request = ProposeConsumptionInput(
+        item_id=item_id,
+        amount=amount,
+    )
+
+    return proposals.build_consumption_proposal(
+        item_id=request.item_id,
+        amount=request.amount,
+    )

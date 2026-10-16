@@ -2,7 +2,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.agent import tools
+from src.agent import proposals, tools
 
 
 def test_search_items_returns_matching_inventory(monkeypatch):
@@ -148,3 +148,92 @@ def test_get_item_handles_individual_tracking(monkeypatch):
 def test_get_item_rejects_invalid_ids(item_id):
     with pytest.raises(ValidationError):
         tools.get_item(item_id)
+
+
+def test_propose_consumption_tool_returns_draft(monkeypatch):
+    """The proposal tool delegates to read-only domain logic."""
+
+    def fake_find_inventory_item(item_id):
+        assert item_id == 17
+
+        return {
+            "id": 17,
+            "name": "Dishwasher tablets, Classic",
+            "tracking_mode": "quantity",
+            "quantity": 24,
+        }
+
+    monkeypatch.setattr(
+        proposals,
+        "find_inventory_item",
+        fake_find_inventory_item,
+    )
+
+    result = tools.propose_consumption(
+        item_id=17,
+        amount=2,
+    )
+
+    assert result == {
+        "status": "draft",
+        "operation": "consume",
+        "item_id": 17,
+        "item_name": "Dishwasher tablets, Classic",
+        "amount": 2,
+        "expected_quantity": 24,
+        "proposed_quantity": 22,
+    }
+
+
+
+@pytest.mark.parametrize(
+    "item_id, amount",
+    [
+        (0, 2),
+        (-1, 2),
+        (True, 2),
+        ("17", 2),
+        (1.5, 2),
+        (17, 0),
+        (17, -1),
+        (17, True),
+        (17, "2"),
+        (17, 1.5),
+    ],
+)
+def test_proposal_tool_rejects_invalid_arguments(
+    monkeypatch,
+    item_id,
+    amount,
+):
+    """Invalid tool inputs must never reach proposal logic."""
+
+    def unexpected_proposal(**kwargs):
+        pytest.fail(
+            "Invalid arguments reached proposal builder."
+        )
+
+    monkeypatch.setattr(
+        proposals,
+        "build_consumption_proposal",
+        unexpected_proposal,
+    )
+
+    with pytest.raises(ValidationError):
+        tools.propose_consumption(
+            item_id=item_id,
+            amount=amount,
+        )
+
+
+def test_proposal_tool_rejects_unexpected_fields():
+    """The tool input contract must forbid extra arguments."""
+
+    with pytest.raises(ValidationError):
+        tools.ProposeConsumptionInput.model_validate(
+            {
+                "item_id": 17,
+                "amount": 2,
+                "approved": True,
+            }
+        )

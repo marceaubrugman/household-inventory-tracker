@@ -69,3 +69,17 @@ def test_dispatch_rejects_invalid_arguments(arguments):
         ToolRequestError, match="Invalid tool arguments"
     ):
         dispatch_read_tool("get_item", arguments)
+
+
+
+def test_read_dispatcher_rejects_consumption_proposal():
+    """Read-only workflows must not invoke proposal tools."""
+
+    with pytest.raises(
+        ToolRequestError,
+        match="Tool is not allowed",
+    ):
+        dispatch_read_tool(
+            "propose_consumption",
+            '{"item_id": 17, "amount": 2}',
+        )
