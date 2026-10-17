@@ -83,3 +83,79 @@ def test_read_dispatcher_rejects_consumption_proposal():
             "propose_consumption",
             '{"item_id": 17, "amount": 2}',
         )
+
+
+def test_proposal_dispatcher_rejects_unresolved_item():
+    """An agent cannot propose consumption without verified identity."""
+
+    with pytest.raises(
+        dispatcher.ToolRequestError,
+        match="Item identity is unresolved",
+    ):
+        dispatcher.dispatch_proposal_tool(
+            "propose_consumption",
+            '{"item_id": 17, "amount": 2}',
+            resolved_item_id=None,
+        )
+
+
+def test_proposal_dispatcher_rejects_mismatched_item(
+    monkeypatch,
+):
+    """A model cannot substitute a different inventory item."""
+
+    def unexpected_proposal(**kwargs):
+        pytest.fail(
+            "Mismatched item reached proposal tool."
+        )
+
+    monkeypatch.setattr(
+        dispatcher.tools,
+        "propose_consumption",
+        unexpected_proposal,
+    )
+
+    with pytest.raises(
+        dispatcher.ToolRequestError,
+        match="Proposed item does not match resolved item",
+    ):
+        dispatcher.dispatch_proposal_tool(
+            "propose_consumption",
+            '{"item_id": 18, "amount": 2}',
+            resolved_item_id=17,
+        )
+
+
+def test_proposal_dispatcher_accepts_resolved_item(
+    monkeypatch,
+):
+    """A verified matching item can reach the proposal tool."""
+
+    expected = {
+        "status": "draft",
+        "operation": "consume",
+        "item_id": 17,
+        "item_name": "Dishwasher tablets, Classic",
+        "amount": 2,
+        "expected_quantity": 24,
+        "proposed_quantity": 22,
+    }
+
+    def fake_proposal(*, item_id, amount):
+        assert item_id == 17
+        assert amount == 2
+        return expected
+
+    monkeypatch.setattr(
+        dispatcher.tools,
+        "propose_consumption",
+        fake_proposal,
+    )
+
+    result = dispatcher.dispatch_proposal_tool(
+        "propose_consumption",
+        '{"item_id": 17, "amount": 2}',
+        resolved_item_id=17,
+    )
+
+    assert result == expected
