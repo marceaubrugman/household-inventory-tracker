@@ -58,3 +58,21 @@ def resolve_consumption_amount(
         return NUMBER_WORDS[amount_text]
 
     return int(amount_text)
+
+
+def extract_consumption_item_description(
+    original_request: str,
+) -> str | None:
+    """Extract the item wording from a supported statement."""
+
+    if resolve_consumption_amount(original_request) is None:
+        return None
+
+    match = CONSUMPTION_PATTERN.fullmatch(
+        original_request.strip()
+    )
+
+    if match is None:
+        return None
+
+    return match.group("item").strip()

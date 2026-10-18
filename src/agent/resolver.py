@@ -11,6 +11,8 @@ MAX_RESOLUTION_ITEMS = 50
 
 def resolve_consumption_item(
     original_request: str,
+    *,
+    exact_description: str | None = None,
 ) -> int | None:
     """Resolve one explicitly identified item, or return None."""
 
@@ -21,6 +23,14 @@ def resolve_consumption_item(
     if not request_words:
         return None
 
+    if exact_description is not None:
+        description_words = sorted(
+            re.findall(r"\w+", exact_description.casefold())
+        )
+
+        if not description_words:
+            return None
+
     items = list_inventory_items(
         sort_key="name",
         limit=MAX_RESOLUTION_ITEMS + 1,
@@ -30,15 +40,29 @@ def resolve_consumption_item(
     if len(items) > MAX_RESOLUTION_ITEMS:
         return None
 
+
     matching_ids = []
 
     for item in items:
-        name_words = set(
-            re.findall(r"\w+", item["name"].casefold())
+        name_tokens = re.findall(
+            r"\w+",
+            item["name"].casefold(),
         )
 
-        if name_words and name_words.issubset(request_words):
+        if exact_description is not None:
+            matches = (
+                bool(name_tokens)
+                and sorted(name_tokens) == description_words
+            )
+        else:
+            matches = (
+                bool(name_tokens)
+                and set(name_tokens).issubset(request_words)
+            )
+
+        if matches:
             matching_ids.append(item["id"])
+
 
     if len(matching_ids) != 1:
         return None
