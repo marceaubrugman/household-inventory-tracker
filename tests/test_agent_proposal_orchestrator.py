@@ -13,29 +13,19 @@ import pytest
 from src.agent.dispatcher import ToolRequestError
 
 
-def test_model_tool_call_produces_guarded_draft(monkeypatch):
-    """A model request must pass Python's proposal safeguards."""
+def test_rejects_direct_proposal_before_search(monkeypatch):
+    """The model must discover inventory before proposing."""
 
-    inventory = [
-        {"id": 17, "name": "Dishwasher tablets, Classic"},
-        {"id": 18, "name": "Dishwasher tablets, Eco"},
-    ]
+    draft_calls = []
 
-    monkeypatch.setattr(
-        resolver,
-        "list_inventory_items",
-        lambda **kwargs: inventory,
-    )
+    def fake_prepare_draft(original_request, arguments_json):
+        draft_calls.append(arguments_json)
+        return {"status": "draft"}
 
     monkeypatch.setattr(
-        proposals,
-        "find_inventory_item",
-        lambda item_id: {
-            "id": 17,
-            "name": "Dishwasher tablets, Classic",
-            "tracking_mode": "quantity",
-            "quantity": 24,
-        },
+        proposal_orchestrator,
+        "prepare_consumption_draft",
+        fake_prepare_draft,
     )
 
     fake_response = SimpleNamespace(
@@ -45,7 +35,7 @@ def test_model_tool_call_produces_guarded_draft(monkeypatch):
                 type="function_call",
                 name="propose_consumption",
                 arguments='{"item_id": 17, "amount": 2}',
-                call_id="call_1",
+                call_id="proposal_1",
             )
         ],
     )
@@ -60,26 +50,26 @@ def test_model_tool_call_produces_guarded_draft(monkeypatch):
         responses=SimpleNamespace(create=fake_create)
     )
 
-    result = (
+    with pytest.raises(
+        ToolRequestError,
+        match="Search required before proposal",
+    ):
         proposal_orchestrator.prepare_agent_consumption_draft(
             original_request=(
                 "I used two Classic dishwasher tablets."
             ),
             client=fake_client,
         )
-    )
 
-    assert result == {
-        "status": "draft",
-        "operation": "consume",
-        "item_id": 17,
-        "item_name": "Dishwasher tablets, Classic",
-        "amount": 2,
-        "expected_quantity": 24,
-        "proposed_quantity": 22,
-    }
-
+    assert draft_calls == []
     assert len(requests) == 1
+
+    assert [
+        tool["name"]
+        for tool in requests[0]["tools"]
+    ] == ["search_items"]
+
+    assert requests[0]["tool_choice"] == "required"
 
 
 def test_search_result_precedes_model_proposal(monkeypatch):

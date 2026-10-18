@@ -46,10 +46,11 @@ SEARCH_TOOL_SCHEMA = next(
 
 INSTRUCTIONS = (
     "You help prepare inventory consumption drafts. "
-    "Use search_items to discover inventory item IDs "
-    "rather than guessing them. "
-    "Only request propose_consumption when the user "
-    "reports consuming inventory. "
+    "First search inventory to discover actual item IDs. "
+    "Never invent inventory IDs. "
+    "After receiving search results, only request "
+    "propose_consumption if the user reports consuming "
+    "an identified inventory item. "
     "Never claim inventory was updated or approved."
 )
 
@@ -82,11 +83,8 @@ def prepare_agent_consumption_draft(
         model="gpt-5.6-luna",
         instructions=INSTRUCTIONS,
         input=original_request,
-        tools=[
-            SEARCH_TOOL_SCHEMA,
-            PROPOSAL_TOOL_SCHEMA,
-        ],
-        tool_choice="auto",
+        tools=[SEARCH_TOOL_SCHEMA],
+        tool_choice="required",
         parallel_tool_calls=False,
         max_output_tokens=300,
         store=False,
@@ -97,16 +95,17 @@ def prepare_agent_consumption_draft(
     if first_call is None:
         return None
 
+
     if first_call.name == "propose_consumption":
-        return prepare_consumption_draft(
-            original_request=original_request,
-            arguments_json=first_call.arguments,
+        raise ToolRequestError(
+            "Search required before proposal."
         )
 
     if first_call.name != "search_items":
         raise ToolRequestError(
             "Unsupported proposal tool."
         )
+
 
     search_result = dispatcher.dispatch_read_tool(
         first_call.name,
