@@ -317,3 +317,81 @@ def test_search_without_proposal_returns_none(monkeypatch):
 
     assert result is None
     assert len(requests) == 2
+
+
+def test_rejects_proposal_absent_from_search_results(
+    monkeypatch,
+):
+    """A model cannot propose an item missing from its search evidence."""
+
+    monkeypatch.setattr(
+        dispatcher,
+        "dispatch_read_tool",
+        lambda name, arguments_json: {
+            "items": [
+                {
+                    "id": 18,
+                    "name": "Dishwasher tablets, Eco",
+                }
+            ],
+            "has_more": False,
+        },
+    )
+
+    draft_calls = []
+
+    def fake_prepare_draft(original_request, arguments_json):
+        draft_calls.append(arguments_json)
+        return {"status": "draft", "item_id": 17}
+
+    monkeypatch.setattr(
+        proposal_orchestrator,
+        "prepare_consumption_draft",
+        fake_prepare_draft,
+    )
+
+    responses = iter(
+        [
+            SimpleNamespace(
+                status="completed",
+                output=[
+                    SimpleNamespace(
+                        type="function_call",
+                        name="search_items",
+                        arguments='{"query": "dishwasher"}',
+                        call_id="search_1",
+                    )
+                ],
+            ),
+            SimpleNamespace(
+                status="completed",
+                output=[
+                    SimpleNamespace(
+                        type="function_call",
+                        name="propose_consumption",
+                        arguments='{"item_id": 17, "amount": 2}',
+                        call_id="proposal_1",
+                    )
+                ],
+            ),
+        ]
+    )
+
+    client = SimpleNamespace(
+        responses=SimpleNamespace(
+            create=lambda **kwargs: next(responses)
+        )
+    )
+
+    with pytest.raises(
+        ToolRequestError,
+        match="not present in search results",
+    ):
+        proposal_orchestrator.prepare_agent_consumption_draft(
+            original_request=(
+                "I used two Classic dishwasher tablets."
+            ),
+            client=client,
+        )
+
+    assert draft_calls == []

@@ -9,6 +9,9 @@ from src.agent.dispatcher import ToolRequestError
 from src.agent.tool_schemas import READ_TOOL_SCHEMAS
 from src.agent.workflow import prepare_consumption_draft
 
+from pydantic import ValidationError
+
+from src.agent.tools import ProposeConsumptionInput
 
 PROPOSAL_TOOL_SCHEMA = {
     "type": "function",
@@ -144,12 +147,37 @@ def prepare_agent_consumption_draft(
     if second_call is None:
         return None
 
+
     if second_call.name != "propose_consumption":
         raise ToolRequestError(
             "Unsupported proposal tool."
+        )
+
+    try:
+        proposed = ProposeConsumptionInput.model_validate_json(
+            second_call.arguments
+        )
+    except ValidationError as error:
+        raise ToolRequestError(
+            "Invalid proposal tool arguments."
+        ) from error
+
+    evidence_ids = {
+        item["id"]
+        for item in search_result.get("items", [])
+        if (
+            isinstance(item, dict)
+            and type(item.get("id")) is int
+        )
+    }
+
+    if proposed.item_id not in evidence_ids:
+        raise ToolRequestError(
+            "Proposed item not present in search results."
         )
 
     return prepare_consumption_draft(
         original_request=original_request,
         arguments_json=second_call.arguments,
     )
+
