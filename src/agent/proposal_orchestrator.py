@@ -47,6 +47,10 @@ SEARCH_TOOL_SCHEMA = next(
 INSTRUCTIONS = (
     "You help prepare inventory consumption drafts. "
     "First search inventory to discover actual item IDs. "
+    "Inventory search uses case-insensitive substring matching, "
+    "not semantic matching or reordered words. "
+    "Use a short, distinctive keyword from the product name, "
+    "rather than the entire natural-language product phrase. "
     "Never invent inventory IDs. "
     "After receiving search results, only request "
     "propose_consumption if the user reports consuming "
