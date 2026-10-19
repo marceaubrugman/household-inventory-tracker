@@ -6,11 +6,14 @@ from src.agent import (
     proposals,
     resolver,
     dispatcher,
+    tools,
 )
 
 import pytest
 
 from src.agent.dispatcher import ToolRequestError
+
+import json
 
 
 def test_rejects_direct_proposal_before_search(monkeypatch):
@@ -385,3 +388,107 @@ def test_rejects_proposal_absent_from_search_results(
         )
 
     assert draft_calls == []
+
+
+def test_real_search_contract_reaches_guarded_proposal(
+    monkeypatch,
+):
+    """Use the real dispatcher and tool response contract."""
+
+    inventory = [
+        {
+            "id": 17,
+            "name": "Dishwasher tablets, Classic",
+            "category": "Cleaning",
+            "location": "Kitchen",
+            "tracking_mode": "quantity",
+            "quantity": 24,
+        }
+    ]
+
+    def fake_search(query, *, sort_key, limit, offset):
+        assert query == "Classic"
+        assert sort_key == "name"
+        assert limit == tools.MAX_SEARCH_RESULTS + 1
+        assert offset == 0
+        return inventory
+
+    monkeypatch.setattr(
+        tools,
+        "search_inventory_items",
+        fake_search,
+    )
+
+    monkeypatch.setattr(
+        resolver,
+        "list_inventory_items",
+        lambda **kwargs: inventory,
+    )
+
+    monkeypatch.setattr(
+        proposals,
+        "find_inventory_item",
+        lambda item_id: inventory[0] if item_id == 17 else None,
+    )
+
+    responses = iter(
+        [
+            SimpleNamespace(
+                status="completed",
+                output=[
+                    SimpleNamespace(
+                        type="function_call",
+                        name="search_items",
+                        arguments='{"query":"Classic"}',
+                        call_id="search_1",
+                    )
+                ],
+            ),
+            SimpleNamespace(
+                status="completed",
+                output=[
+                    SimpleNamespace(
+                        type="function_call",
+                        name="propose_consumption",
+                        arguments='{"item_id":17,"amount":2}',
+                        call_id="proposal_1",
+                    )
+                ],
+            ),
+        ]
+    )
+
+    requests = []
+
+    def fake_create(**kwargs):
+        requests.append(kwargs)
+        return next(responses)
+
+    client = SimpleNamespace(
+        responses=SimpleNamespace(create=fake_create)
+    )
+
+    draft = proposal_orchestrator.prepare_agent_consumption_draft(
+        original_request="I used two Classic dishwasher tablets.",
+        client=client,
+    )
+
+    assert draft["status"] == "draft"
+    assert draft["item_id"] == 17
+    assert draft["amount"] == 2
+    assert draft["expected_quantity"] == 24
+    assert draft["proposed_quantity"] == 22
+
+    assert len(requests) == 2
+
+    search_output = next(
+        item
+        for item in requests[1]["input"]
+        if item.get("type") == "function_call_output"
+    )
+
+    evidence = json.loads(search_output["output"])
+
+    assert "matches" in evidence
+    assert "items" not in evidence
+    assert evidence["matches"][0]["id"] == 17
