@@ -163,7 +163,7 @@ def prepare_agent_consumption_draft(
 
     evidence_ids = {
         item["id"]
-        for item in search_result.get("items", [])
+        for item in search_result.get("matches", [])
         if (
             isinstance(item, dict)
             and type(item.get("id")) is int

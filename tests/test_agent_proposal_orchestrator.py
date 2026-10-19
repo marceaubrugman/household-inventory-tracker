@@ -83,7 +83,7 @@ def test_search_result_precedes_model_proposal(monkeypatch):
         assert name == "search_items"
 
         return {
-            "items": [
+            "matches": [
                 {"id": 17, "name": "Dishwasher tablets, Classic"},
                 {"id": 18, "name": "Dishwasher tablets, Eco"},
             ],
