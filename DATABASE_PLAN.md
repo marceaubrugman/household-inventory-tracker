@@ -14,6 +14,7 @@ It records:
 * how v0.7.0 made Docker startup reproducible through service health checks, readiness-based startup ordering, and automatic first-run schema initialization
 * how v0.8.0 exposed secure API query capabilities through search, approved sorting, low-stock filtering, and bounded pagination
 * how v0.9.0 deployed the unchanged PostgreSQL-backed application model to Azure Database for PostgreSQL Flexible Server and verified cloud persistence, secret-based configuration, and dependency-failure recovery
+* how the v0.10.0 feature branch reuses existing PostgreSQL reads for bounded AI inventory discovery and independently guarded consumption drafts, without a schema change or stock mutation
 * the responsibilities of the database, repository, service, and interface layers
 * current security, validation, migration, and integrity decisions
 * the migration path from the legacy JSON format
@@ -23,7 +24,7 @@ The current database model remains intentionally focused. It supports quantity-t
 
 ## Current Status
 
-**Implemented through HIT v0.9.0**
+**Stable database baseline: HIT v0.9.0. v0.10.0 guarded agentic proposal work is in Pre-Lock and has not been released.**
 
 PostgreSQL is the primary source of truth for inventory data.
 
@@ -70,6 +71,8 @@ Docker Compose is intended for reproducible local development. In v0.7.0, Postgr
 GitHub Actions, introduced in v0.5.0, verifies non-integration Python tests, PostgreSQL integration tests, and Docker image builds on pushes and pull requests.
 
 v0.8.0 expanded the existing database-backed query path without changing the PostgreSQL schema. The FastAPI `GET /items` endpoint now exposes literal case-insensitive search, approved sorting, low-stock filtering, and optional bounded `limit`/`offset` pagination through the service and repository layers. SQL values remain parameterized, dynamic sort expressions remain allowlisted, and stable item-ID tie-breaking preserves deterministic ordering.
+
+v0.10.0 uses this same persistence foundation for an experimental Python-level agent workflow: the model may search inventory and suggest a draft; independent Python validation and PostgreSQL reads remain authoritative. No migration, new table, or agent-authorized stock update was introduced.
 
 ## Current Persistence Architecture
 
@@ -168,6 +171,48 @@ DATABASE_URL=postgresql://hit_user:hit_password@db:5432/hit
 ```
 
 Tracking-mode data flows through all persistence-facing layers. The API can create both tracking modes and perform atomic transitions between them. The console currently remains quantity-oriented, but updates preserve the stored tracking mode of existing records.
+
+## v0.10.0 Agentic Read and Draft Boundaries (Pre-Lock)
+
+HIT's v0.10.0 feature branch introduces a bounded, **Python-level** agentic workflow. It is not currently a FastAPI endpoint, browser feature, inventory write API, or new persistence model. The stable released Azure deployment remains v0.9.0.
+
+### Inventory search and evidence
+
+```text
+Model requests approved `search_items`
+   ↓
+src/agent/dispatcher.py validates tool name and arguments
+   ↓
+src/agent/tools.py calls item_service.search_inventory_items
+   ↓
+item_repository.py → database.py → PostgreSQL
+   ↓
+{"matches": [...], "has_more": false}
+```
+
+The tool returns no more than five matching item summaries and includes a `has_more` flag when additional records exist. Returned records include item ID, name, category, location, tracking mode, and current quantity. The **actual response key is `matches`, not `items`**. A new regression test exercises the real dispatcher and tool response rather than fabricating that contract in the orchestration mock.
+
+Inventory search is literal case-insensitive substring matching, not semantic or reordered-word retrieval. For example, `Classic` matches `Dishwasher tablets, Classic`, while the reordered complete phrase `Classic dishwasher tablets` does not. The model is guided to use short distinctive search terms, while independent Python validation remains essential.
+
+### Guarded consumption draft, not a stock movement
+
+The first model request exposes search only; a second request may ask for `propose_consumption(item_id, amount)`. The agent accepts at most one function call per completed model response, with at most two model requests and no parallel tool execution. Before producing a draft:
+
+* Pydantic validates tool arguments and positive integer inputs.
+* The proposed item ID must have appeared in the real search `matches`.
+* Python independently extracts the consumption amount and intended item from the original user statement.
+* The resolver requires an unambiguous inventory identity; proposal ID and amount must agree with the independently resolved values.
+* The proposal builder re-reads the item, requires `tracking_mode = quantity`, and rejects a consumption amount exceeding current stock.
+
+A successful result contains `status: draft`, item identity, `amount`, `expected_quantity`, and `proposed_quantity`. These are **computed application data**, not a PostgreSQL update or persisted proposal record. In the v0.10.0 live demonstration, consuming two Classic dishwasher tablets proposed **24 → 22**, while the stored item remained **24**.
+
+Known database configuration and `psycopg.OperationalError` failures are converted to the existing `InventoryUnavailableError` during both initial search and subsequent verification. Missing matches remain a different, normal search outcome. HIT does not retry failed database operations or return an unverified draft.
+
+### Boundaries for future work
+
+There is currently no consumption execution, approval audit, stock-movement history, concurrency protection for future writes, or agent-specific HTTP endpoint. The expected quantity in a draft is **not permission to overwrite stock later**. A future execution flow must require explicit human authorization and recheck live inventory atomically. Real household-data use with a model provider also requires an explicit privacy and consent decision.
+
+No SQL schema or migration change was required for v0.10.0. Its testing evidence includes 164 passing non-integration tests locally, a successful PostgreSQL 18 integration job on isolated `hit_test` in GitHub Actions, and a successful Docker-build job on feature-branch commit `ec247b3`.
 
 ## Database Environments
 
@@ -322,7 +367,7 @@ CREATE TABLE IF NOT EXISTS hit.items (
 );
 ```
 
-The standalone schema represents the final v0.6.0 database model and remains unchanged through v0.9.0. Fresh Docker environments now apply this schema automatically. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
+The standalone schema represents the final v0.6.0 database model and remains unchanged in v0.9.0 and the v0.10.0 Pre-Lock feature branch. Fresh Docker environments apply this schema automatically. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
 
 ## Field Definitions
 
@@ -902,6 +947,10 @@ Invalid path or request body
 
 Technical database information is not included in public API responses.
 
+### Agentic workflow boundary (v0.10.0 feature branch)
+
+The Python proposal orchestrator converts known `DatabaseConfigurationError` and `psycopg.OperationalError` failures during both inventory search and independent proposal verification into the existing `InventoryUnavailableError` with a safe message. It does not present a failed lookup as an empty successful search. This Python error is **not yet an agent-specific FastAPI HTTP response** because no such route exists.
+
 Programming defects and malformed SQL are not broadly converted into `503` responses. They remain visible as server errors so they can be diagnosed rather than disguised as infrastructure outages.
 
 ## Data Integrity
@@ -1046,7 +1095,7 @@ If any database operation fails, the complete migration is rolled back.
 
 ## Testing Strategy
 
-The current suite contains 105 passing automated tests before final v0.9.0 Lock verification. v0.9.0 does not add application behavior or change the PostgreSQL schema, so the existing suite remains the regression baseline while release-level Azure checks add deployment, persistence, and failure-recovery evidence.
+The stable v0.9.0 automated-test baseline was 105 tests. During v0.10.0 Pre-Lock, 164 non-integration tests passed locally; 34 PostgreSQL integration tests were included in the successful isolated `hit_test` CI job, and the Docker build also passed. The new agent tests cover tool schemas, dispatch, intent, identity resolution, proposal rules, real search-response contracts, and failure handling. No new database schema test was required because the schema is unchanged.
 
 ## Unit and service tests
 
@@ -1062,6 +1111,9 @@ Tests that do not require PostgreSQL cover:
 * partial-update merging
 * atomic tracking-mode transitions
 * deletion outcomes
+* agent read-tool validation and bounded tool orchestration
+* model-independent consumption intent, identity, and quantity verification
+* draft-only inventory proposal calculations and database outage handling
 
 These tests use fakes and pytest monkeypatching.
 
@@ -1300,6 +1352,7 @@ The current database model does not yet support:
 * structured household locations
 * category management
 * stock-movement history
+* agent-approved execution or a persistent draft/approval history (v0.10.0 only proposes)
 * audit trails
 * attachments or images
 * expiry dates
@@ -1331,7 +1384,9 @@ These are future capabilities, not unfinished current-release work.
 
 ## Next Database Stage
 
-The v0.9.0 Azure deployment foundation preserves the existing PostgreSQL model and database-access contract without introducing a schema migration.
+The v0.9.0 Azure deployment foundation preserves the existing PostgreSQL model and database-access contract. v0.10.0 additionally demonstrates agentic **read and draft** behavior with the same schema, without a migration or stored quantity change.
+
+For Technical Apprenticeship I, a proposed later v0.12.0 bridge would add only the minimum consumption/depletion or stock-movement history needed to support a separate household purchasing-intelligence system. Its event semantics, migration plan, and consistency rules must be designed and tested at that time, not retroactively attributed to v0.10.0.
 
 Future database work should remain requirement-driven. Likely candidates include:
 
@@ -1714,3 +1769,11 @@ HIT v0.9.0 established:
 No PostgreSQL schema migration was required for v0.9.0. The release changes deployment topology rather than the inventory data model.
 
 Future database work can focus on automated migration tooling, timestamps, users, households, audit history, measured indexing needs, and Azure deployment hardening when product requirements justify it.
+
+## v0.10.0 Guarded Agentic Inventory Proposals (Pre-Lock Milestone)
+
+The v0.10.0 feature branch reuses the established PostgreSQL 18 inventory table, search service, repository, and `DATABASE_URL` contract. It adds no schema migration, stock movement, API endpoint, or Azure-specific database code.
+
+The agent's real-PostgreSQL demonstration established read-only inventory evidence followed by a Python-validated draft; current stock was unchanged. Search-contract regression tests and controlled database-outage behavior were added. CI succeeded on commit `ec247b3` for non-integration tests, PostgreSQL integration tests, and the Docker build. The branch remains unreleased until the usual Pre-Lock and Lock gates are complete.
+
+The next actual database change is deferred to a later consumption-history bridge, if its requirements justify it.
