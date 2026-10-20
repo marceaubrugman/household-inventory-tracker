@@ -15,6 +15,8 @@ from src.agent.dispatcher import ToolRequestError
 
 import json
 
+import psycopg
+
 
 def test_rejects_direct_proposal_before_search(monkeypatch):
     """The model must discover inventory before proposing."""
@@ -492,3 +494,137 @@ def test_real_search_contract_reaches_guarded_proposal(
     assert "matches" in evidence
     assert "items" not in evidence
     assert evidence["matches"][0]["id"] == 17
+
+
+def test_proposal_search_database_outage_is_safe(monkeypatch):
+    """A database outage must stop proposal generation safely."""
+
+    model_requests = []
+
+    def fake_create(**kwargs):
+        model_requests.append(kwargs)
+
+        return SimpleNamespace(
+            status="completed",
+            output=[
+                SimpleNamespace(
+                    type="function_call",
+                    name="search_items",
+                    arguments='{"query":"Classic"}',
+                    call_id="search_1",
+                )
+            ],
+        )
+
+    def unavailable_database(name, arguments):
+        raise psycopg.OperationalError(
+            "Sensitive database connection details"
+        )
+
+    monkeypatch.setattr(
+        proposal_orchestrator.dispatcher,
+        "dispatch_read_tool",
+        unavailable_database,
+    )
+
+    fake_client = SimpleNamespace(
+        responses=SimpleNamespace(create=fake_create)
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Inventory data is temporarily unavailable.",
+    ) as error_info:
+        proposal_orchestrator.prepare_agent_consumption_draft(
+            original_request=(
+                "I used two Classic dishwasher tablets."
+            ),
+            client=fake_client,
+        )
+
+    assert "Sensitive database" not in str(error_info.value)
+    assert len(model_requests) == 1
+
+
+def test_proposal_verification_database_outage_is_safe(
+    monkeypatch,
+):
+    """A database outage during verification must fail safely."""
+
+    responses = iter([
+        SimpleNamespace(
+            status="completed",
+            output=[
+                SimpleNamespace(
+                    type="function_call",
+                    name="search_items",
+                    arguments='{"query":"Classic"}',
+                    call_id="search_1",
+                ),
+            ],
+        ),
+        SimpleNamespace(
+            status="completed",
+            output=[
+                SimpleNamespace(
+                    type="function_call",
+                    name="propose_consumption",
+                    arguments='{"item_id":17,"amount":2}',
+                    call_id="proposal_1",
+                ),
+            ],
+        ),
+    ])
+
+    model_requests = []
+
+    def fake_create(**kwargs):
+        model_requests.append(kwargs)
+        return next(responses)
+
+    def fake_search(name, arguments):
+        assert name == "search_items"
+        return {
+            "matches": [
+                {"id": 17, "name": "Dishwasher tablets, Classic"}
+            ],
+            "has_more": False,
+        }
+
+    def unavailable_verification(
+        original_request,
+        arguments_json,
+    ):
+        raise psycopg.OperationalError(
+            "Sensitive database connection details"
+        )
+
+    monkeypatch.setattr(
+        proposal_orchestrator.dispatcher,
+        "dispatch_read_tool",
+        fake_search,
+    )
+
+    monkeypatch.setattr(
+        proposal_orchestrator,
+        "prepare_consumption_draft",
+        unavailable_verification,
+    )
+
+    fake_client = SimpleNamespace(
+        responses=SimpleNamespace(create=fake_create)
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Inventory data is temporarily unavailable.",
+    ) as error_info:
+        proposal_orchestrator.prepare_agent_consumption_draft(
+            original_request=(
+                "I used two Classic dishwasher tablets."
+            ),
+            client=fake_client,
+        )
+
+    assert "Sensitive database" not in str(error_info.value)
+    assert len(model_requests) == 2

@@ -13,6 +13,11 @@ from pydantic import ValidationError
 
 from src.agent.tools import ProposeConsumptionInput
 
+import psycopg
+
+from src.database import DatabaseConfigurationError
+from src.agent.orchestrator import InventoryUnavailableError
+
 PROPOSAL_TOOL_SCHEMA = {
     "type": "function",
     "name": "propose_consumption",
@@ -110,11 +115,18 @@ def prepare_agent_consumption_draft(
             "Unsupported proposal tool."
         )
 
-
-    search_result = dispatcher.dispatch_read_tool(
-        first_call.name,
-        first_call.arguments,
-    )
+    try:
+        search_result = dispatcher.dispatch_read_tool(
+            first_call.name,
+            first_call.arguments,
+        )
+    except (
+            DatabaseConfigurationError,
+            psycopg.OperationalError,
+    ):
+        raise InventoryUnavailableError(
+            "Inventory data is temporarily unavailable."
+        ) from None
 
     continuation_input = [
         {
@@ -179,8 +191,16 @@ def prepare_agent_consumption_draft(
             "Proposed item not present in search results."
         )
 
-    return prepare_consumption_draft(
-        original_request=original_request,
-        arguments_json=second_call.arguments,
-    )
+    try:
+        return prepare_consumption_draft(
+            original_request=original_request,
+            arguments_json=second_call.arguments,
+        )
+    except (
+            DatabaseConfigurationError,
+            psycopg.OperationalError,
+    ):
+        raise InventoryUnavailableError(
+            "Inventory data is temporarily unavailable."
+        ) from None
 
