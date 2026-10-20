@@ -203,4 +203,3 @@ def prepare_agent_consumption_draft(
         raise InventoryUnavailableError(
             "Inventory data is temporarily unavailable."
         ) from None
-
