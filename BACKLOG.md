@@ -14,9 +14,9 @@ The project is developed incrementally. Each release should:
 
 ## Current Status
 
-**Stable release: v0.9.0**
+**Current mainline version: v0.10.0 (Guarded Agentic Inventory Proposals)**
 
-**Current development milestone: v0.10.0 (Guarded Agentic Inventory Proposals), Pre-Lock on `feature/agentic-inventory`. Not yet merged, tagged, published, or deployed to Azure as v0.10.0.**
+**Merged through [PR #14](https://github.com/marceaubrugman/household-inventory-tracker/pull/14) into `main` (merge commit `55a751d`). Release publication and Close-tail evidence are tracked in the checklist below. The existing v0.9.0 Azure deployment has not been replaced by a v0.10.0 deployment.**
 
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
@@ -54,10 +54,10 @@ The current implementation includes:
 * GitHub Actions checks for Python tests, PostgreSQL integration tests, and Docker image builds
 * unit, API, service, migration, repository, and full-stack PostgreSQL integration tests
 * 105 passing automated tests at the v0.9.0 baseline
-* bounded, search-first AI inventory discovery and draft-only consumption proposals in the v0.10.0 feature branch
+* bounded, search-first AI inventory discovery and draft-only consumption proposals introduced in v0.10.0
 * independent Python verification of proposed item IDs, consumption amounts, tracking modes, and available stock
 * verified unchanged PostgreSQL quantities after the live AI demonstration
-* 164 passing non-integration tests and 34 PostgreSQL integration tests verified in CI during v0.10.0 Tock
+* 164 passing non-integration tests locally and 34 PostgreSQL integration tests verified in CI for v0.10.0
 
 PostgreSQL remains the application’s source of truth.
 
@@ -65,7 +65,7 @@ The JSON runtime used in v0.1.0 has been removed. JSON remains supported only as
 
 Docker Compose starts the FastAPI API service and a PostgreSQL 18 database service together for reproducible local development.
 
-v0.9.0 is released. v0.10.0 Tick and Tock are complete on `feature/agentic-inventory`; the feature scope is frozen and Pre-Lock documentation is in progress. The release has not been merged into `main`.
+v0.10.0 Tick, Tock, and Pre-Lock are complete. The feature branch was merged through PR #14, and all three GitHub Actions jobs passed on exact `main` merge commit `55a751d`. The Lock checklist records final verification and publication gates.
 
 ## Current Architecture
 
@@ -101,7 +101,7 @@ database.py
 PostgreSQL
 ```
 
-### Agentic inventory path (v0.10.0 feature branch)
+### Agentic inventory path (v0.10.0)
 
 ```text
 User consumption statement
@@ -1040,29 +1040,29 @@ Add one meaningful, bounded AI capability over HIT's established Python/PostgreS
 * [x] Preserve the existing PostgreSQL schema, console, API, Docker, and Azure deployment architecture
 * [x] Freeze v0.10.0 feature scope
 
-### Pre-Lock (in progress)
+### Pre-Lock (accepted)
 
-* [ ] Align README, BACKLOG, and DATABASE_PLAN with the v0.10.0 development state
-* [ ] Verify descriptions against the actual Python API and test contracts
-* [ ] Check the complete code and documentation diff against the v0.9.0 baseline
-* [ ] Inspect tracked files for credentials and private inventory data
-* [ ] Produce the final Lock acceptance checklist
+* [x] Align README, BACKLOG, and DATABASE_PLAN with the v0.10.0 development state
+* [x] Verify descriptions against the actual Python API and test contracts
+* [x] Check the complete code and documentation diff against the v0.9.0 baseline
+* [x] Inspect tracked files for credentials and private inventory data
+* [x] Produce the final Lock acceptance checklist
 
-### Lock (not started)
+### Lock (publication pending)
 
-* [ ] Confirm dependency installation and Python compile checks
-* [ ] Run final test and whitespace checks on the release candidate
-* [ ] Verify the Docker build and any necessary local smoke checks
-* [ ] Review public documentation and version metadata
-* [ ] Commit and push the reviewed release candidate
-* [ ] Open and review the v0.10.0 pull request
-* [ ] Confirm all three GitHub Actions jobs pass for the candidate
-* [ ] Merge the release work into `main`
-* [ ] Verify the exact merged release state
-* [ ] Create and push the annotated `v0.10.0` tag
+* [x] Confirm dependency installation and Python compile checks
+* [x] Run final test and whitespace checks on the release candidate
+* [x] Verify the Docker build and isolated local API/persistence smoke checks
+* [x] Review public documentation and version metadata
+* [x] Commit and push the reviewed release candidate
+* [x] Open and review v0.10.0 pull request #14
+* [x] Confirm all three GitHub Actions jobs pass on the candidate and the merged `main` commit
+* [x] Merge the release work into `main` via PR #14
+* [x] Verify exact merge commit `55a751d` and passing CI on `main`
+* [ ] Create and push the annotated `v0.10.0` tag after the documentation-only release commit passes CI
 * [ ] Publish the GitHub Release
 
-### Close tail (not started)
+### Close tail (after publication)
 
 * [ ] Record the released commit, tag, PR, and CI evidence
 * [ ] Create the canonical v0.10.0 to v0.11.0 handover
@@ -1197,7 +1197,7 @@ Later:
 
 ## AI-assisted capabilities
 
-Completed in v0.10.0 development:
+Completed in v0.10.0:
 
 * [x] Define and demonstrate a useful, bounded AI-assisted consumption proposal
 * [x] Keep deterministic inventory operations independent from AI
@@ -1244,9 +1244,9 @@ Later, before a public or user-facing agent product:
 
 # Immediate Next Action
 
-HIT v0.9.0 remains the stable release. v0.10.0 is in Pre-Lock on `feature/agentic-inventory`, with Tick and Tock accepted.
+HIT v0.10.0 has been merged into `main` through PR #14 (`55a751d`); the post-merge CI checks passed.
 
-Review and incorporate the coordinated documentation changes, then inspect the complete release diff and prepare the final Lock checklist. Do not merge, tag, or claim a v0.10.0 Azure deployment until the release gates have been completed. The Learning Library update remains the final Close-tail learning step.
+Commit and push the final release-documentation reconciliation on `main`, verify CI on that documentation commit, then create the annotated `v0.10.0` tag and publish the GitHub Release. Record the final tag and release in the Close tail. No v0.10.0 Azure deployment is claimed. Update the Living Learning Library last.
 
 ## Proposed Apprenticeship I finishing sequence (not yet activated)
 

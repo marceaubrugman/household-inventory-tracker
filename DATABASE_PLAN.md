@@ -14,7 +14,7 @@ It records:
 * how v0.7.0 made Docker startup reproducible through service health checks, readiness-based startup ordering, and automatic first-run schema initialization
 * how v0.8.0 exposed secure API query capabilities through search, approved sorting, low-stock filtering, and bounded pagination
 * how v0.9.0 deployed the unchanged PostgreSQL-backed application model to Azure Database for PostgreSQL Flexible Server and verified cloud persistence, secret-based configuration, and dependency-failure recovery
-* how the v0.10.0 feature branch reuses existing PostgreSQL reads for bounded AI inventory discovery and independently guarded consumption drafts, without a schema change or stock mutation
+* how v0.10.0 reuses existing PostgreSQL reads for bounded AI inventory discovery and independently guarded consumption drafts, without a schema change or stock mutation
 * the responsibilities of the database, repository, service, and interface layers
 * current security, validation, migration, and integrity decisions
 * the migration path from the legacy JSON format
@@ -24,7 +24,7 @@ The current database model remains intentionally focused. It supports quantity-t
 
 ## Current Status
 
-**Stable database baseline: HIT v0.9.0. v0.10.0 guarded agentic proposal work is in Pre-Lock and has not been released.**
+**Current mainline database baseline: HIT v0.10.0. Its PostgreSQL schema is unchanged from v0.9.0; the earlier Azure learning deployment remains at the v0.9.0 foundation.**
 
 PostgreSQL is the primary source of truth for inventory data.
 
@@ -172,9 +172,9 @@ DATABASE_URL=postgresql://hit_user:hit_password@db:5432/hit
 
 Tracking-mode data flows through all persistence-facing layers. The API can create both tracking modes and perform atomic transitions between them. The console currently remains quantity-oriented, but updates preserve the stored tracking mode of existing records.
 
-## v0.10.0 Agentic Read and Draft Boundaries (Pre-Lock)
+## v0.10.0 Agentic Read and Draft Boundaries
 
-HIT's v0.10.0 feature branch introduces a bounded, **Python-level** agentic workflow. It is not currently a FastAPI endpoint, browser feature, inventory write API, or new persistence model. The stable released Azure deployment remains v0.9.0.
+HIT v0.10.0 introduces a bounded, **Python-level** agentic workflow. It is not currently a FastAPI endpoint, browser feature, inventory write API, or new persistence model. The stable released Azure deployment remains v0.9.0.
 
 ### Inventory search and evidence
 
@@ -212,7 +212,7 @@ Known database configuration and `psycopg.OperationalError` failures are convert
 
 There is currently no consumption execution, approval audit, stock-movement history, concurrency protection for future writes, or agent-specific HTTP endpoint. The expected quantity in a draft is **not permission to overwrite stock later**. A future execution flow must require explicit human authorization and recheck live inventory atomically. Real household-data use with a model provider also requires an explicit privacy and consent decision.
 
-No SQL schema or migration change was required for v0.10.0. Its testing evidence includes 164 passing non-integration tests locally, a successful PostgreSQL 18 integration job on isolated `hit_test` in GitHub Actions, and a successful Docker-build job on feature-branch commit `ec247b3`.
+No SQL schema or migration change was required for v0.10.0. Its testing evidence includes 164 passing non-integration tests locally and successful non-integration, PostgreSQL 18 `hit_test` integration (34 tests), and Docker-build jobs on the exact merged `main` commit `55a751d`. The isolated local Docker smoke test verified PostgreSQL-backed CRUD and persistence after API container recreation.
 
 ## Database Environments
 
@@ -367,7 +367,7 @@ CREATE TABLE IF NOT EXISTS hit.items (
 );
 ```
 
-The standalone schema represents the final v0.6.0 database model and remains unchanged in v0.9.0 and the v0.10.0 Pre-Lock feature branch. Fresh Docker environments apply this schema automatically. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
+The standalone schema represents the final v0.6.0 database model and remains unchanged through v0.10.0. Fresh Docker environments apply this schema automatically. Existing v0.5.0 databases are upgraded through the sequential SQL files in `sql/migrations/`.
 
 ## Field Definitions
 
@@ -947,7 +947,7 @@ Invalid path or request body
 
 Technical database information is not included in public API responses.
 
-### Agentic workflow boundary (v0.10.0 feature branch)
+### Agentic workflow boundary (v0.10.0)
 
 The Python proposal orchestrator converts known `DatabaseConfigurationError` and `psycopg.OperationalError` failures during both inventory search and independent proposal verification into the existing `InventoryUnavailableError` with a safe message. It does not present a failed lookup as an empty successful search. This Python error is **not yet an agent-specific FastAPI HTTP response** because no such route exists.
 
@@ -1095,7 +1095,7 @@ If any database operation fails, the complete migration is rolled back.
 
 ## Testing Strategy
 
-The stable v0.9.0 automated-test baseline was 105 tests. During v0.10.0 Pre-Lock, 164 non-integration tests passed locally; 34 PostgreSQL integration tests were included in the successful isolated `hit_test` CI job, and the Docker build also passed. The new agent tests cover tool schemas, dispatch, intent, identity resolution, proposal rules, real search-response contracts, and failure handling. No new database schema test was required because the schema is unchanged.
+The v0.9.0 automated-test baseline was 105 tests. For v0.10.0, 164 non-integration tests passed locally; 34 PostgreSQL integration tests and the Docker build passed through CI on the merged `main` commit `55a751d`. The new agent tests cover tool schemas, dispatch, intent, identity resolution, proposal rules, real search-response contracts, and failure handling. No new database schema test was required because the schema is unchanged.
 
 ## Unit and service tests
 
@@ -1770,10 +1770,10 @@ No PostgreSQL schema migration was required for v0.9.0. The release changes depl
 
 Future database work can focus on automated migration tooling, timestamps, users, households, audit history, measured indexing needs, and Azure deployment hardening when product requirements justify it.
 
-## v0.10.0 Guarded Agentic Inventory Proposals (Pre-Lock Milestone)
+## v0.10.0 Guarded Agentic Inventory Proposals Milestone
 
-The v0.10.0 feature branch reuses the established PostgreSQL 18 inventory table, search service, repository, and `DATABASE_URL` contract. It adds no schema migration, stock movement, API endpoint, or Azure-specific database code.
+HIT v0.10.0 reuses the established PostgreSQL 18 inventory table, search service, repository, and `DATABASE_URL` contract. It adds no schema migration, stock movement, API endpoint, or Azure-specific database code.
 
-The agent's real-PostgreSQL demonstration established read-only inventory evidence followed by a Python-validated draft; current stock was unchanged. Search-contract regression tests and controlled database-outage behavior were added. CI succeeded on commit `ec247b3` for non-integration tests, PostgreSQL integration tests, and the Docker build. The branch remains unreleased until the usual Pre-Lock and Lock gates are complete.
+The agent's real-PostgreSQL demonstration established read-only inventory evidence followed by a Python-validated draft; current stock was unchanged. Search-contract regression tests and controlled database-outage behavior were added. CI succeeded on the exact merged `main` commit `55a751d` for non-integration tests, 34 PostgreSQL integration tests, and the Docker build. Release publication evidence is tracked in `BACKLOG.md`.
 
 The next actual database change is deferred to a later consumption-history bridge, if its requirements justify it.
