@@ -1072,18 +1072,19 @@ Add one meaningful, bounded AI capability over HIT's established Python/PostgreS
 * GitHub Release: https://github.com/marceaubrugman/household-inventory-tracker/releases/tag/v0.10.0
 * Exact-release-commit CI: https://github.com/marceaubrugman/household-inventory-tracker/actions/runs/39425458664
 * Tag-triggered CI: https://github.com/marceaubrugman/household-inventory-tracker/actions/runs/39425768317
+* Post-release Close status commit: `8d81e7c` (CI passed on `main`: https://github.com/marceaubrugman/household-inventory-tracker/actions/runs/39436411594)
 * All three jobs passed: Python non-integration, isolated PostgreSQL integration, Docker build
 * Local release smoke: fresh isolated Docker Compose PostgreSQL, health, read/write, and persistence after API container recreation; the smoke-test PostgreSQL volume remains preserved
 * Live model+PostgreSQL demo: guarded draft `24 -> 22`, actual stored quantity remained `24`
 * No new Azure deployment for v0.10.0 and no agent HTTP interface
 * Azure cost action: both v0.9.0 compute resources stopped 20 October; registry and database storage remain, and PostgreSQL may auto-restart about 27 October. Azure review reminder set for 26 October.
 
-### Close tail (in progress)
+### Close tail (in progress; Learning Library pending)
 
 * [x] Record released commit `9323d41`, annotated tag `v0.10.0`, PR #14, and passing final/tag CI
-* [ ] Create the canonical v0.10.0 to v0.11.0 handover
+* [x] Create and accept private canonical `HIT_v0.10.0_TO_v0.11.0_CANONICAL_HANDOVER__KEEP.md` (20 October 2026); keep outside public Git
 * [x] Confirm Azure Container App `ca-hit-v090` and PostgreSQL Flexible Server `pg-hit-v090-marceau` stopped by user in Azure Portal on 20 October 2026; preserve ACR, identity, environment, and PostgreSQL storage. Note nonzero residual charges and PostgreSQL seven-day automatic restart. Local isolated smoke-test containers shut down without deleting volume; previous agent demo data preserved.
-* [ ] Clean up merged branches and stale remote refs
+* [x] Delete merged `feature/agentic-inventory` locally and remotely, then run `git fetch --prune origin` (20 October 2026); retain unrelated historical local branches
 * [ ] Curate the Living Learning Library last
 
 ### Explicit scope boundaries
@@ -1262,7 +1263,9 @@ Later, before a public or user-facing agent product:
 
 HIT v0.10.0 was published on 20 October 2026 as a normal GitHub Release with annotated tag `v0.10.0` pointing to `9323d41`; CI passed on the release commit and on the tag push. The v0.9.0 Azure deployment remains preserved with Container App and PostgreSQL compute stopped (not necessarily zero-cost).
 
-Next: commit this post-release status record, clean up the merged `feature/agentic-inventory` branch safely, create the canonical v0.10.0 → v0.11.0 handover, and curate the private Living Learning Library **last**. Check Azure on 26 October before PostgreSQL auto-restarts and free credit expires. No v0.10.0 Azure deployment is claimed.
+The post-release status record was committed as `8d81e7c`; all three GitHub Actions jobs passed on that commit. The merged `feature/agentic-inventory` branch was removed locally and remotely and stale refs were pruned. The private canonical `HIT_v0.10.0_TO_v0.11.0_CANONICAL_HANDOVER__KEEP.md` was reviewed and accepted on 20 October 2026.
+
+Next: commit the final Close-tail status corrections, then curate the private Living Learning Library **last**. After that, declare v0.10.0 Close complete and begin v0.11.0 Tick in a fresh chat. Check Azure on 26 October before PostgreSQL auto-restarts and free credit expires. No v0.10.0 Azure deployment is claimed.
 
 ## Proposed Apprenticeship I finishing sequence (not yet activated)
 
