@@ -16,7 +16,7 @@ The project is developed incrementally. Each release should:
 
 **Current mainline version: v0.10.0 (Guarded Agentic Inventory Proposals)**
 
-**Merged through [PR #14](https://github.com/marceaubrugman/household-inventory-tracker/pull/14) into `main` (merge commit `55a751d`). Release publication and Close-tail evidence are tracked in the checklist below. The existing v0.9.0 Azure deployment has not been replaced by a v0.10.0 deployment.**
+**Published release `v0.10.0` (20 October 2026) via [PR #14](https://github.com/marceaubrugman/household-inventory-tracker/pull/14) and merge commit `55a751d`. Annotated release tag targets `9323d41` after final release-documentation reconciliation; final and tag-triggered CI passed. The existing v0.9.0 Azure deployment has not been replaced by a v0.10.0 deployment.**
 
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
@@ -1048,7 +1048,7 @@ Add one meaningful, bounded AI capability over HIT's established Python/PostgreS
 * [x] Inspect tracked files for credentials and private inventory data
 * [x] Produce the final Lock acceptance checklist
 
-### Lock (publication pending)
+### Lock (complete; v0.10.0 published)
 
 * [x] Confirm dependency installation and Python compile checks
 * [x] Run final test and whitespace checks on the release candidate
@@ -1059,14 +1059,30 @@ Add one meaningful, bounded AI capability over HIT's established Python/PostgreS
 * [x] Confirm all three GitHub Actions jobs pass on the candidate and the merged `main` commit
 * [x] Merge the release work into `main` via PR #14
 * [x] Verify exact merge commit `55a751d` and passing CI on `main`
-* [ ] Create and push the annotated `v0.10.0` tag after the documentation-only release commit passes CI
-* [ ] Publish the GitHub Release
+* [x] Create and push the annotated `v0.10.0` tag on exact final release commit `9323d41` after final CI passed
+* [x] Publish GitHub Release `v0.10.0` (20 October 2026; normal release, not a prerelease)
 
-### Close tail (after publication)
 
-* [ ] Record the released commit, tag, PR, and CI evidence
+### Published release provenance
+
+* PR #14: https://github.com/marceaubrugman/household-inventory-tracker/pull/14
+* Merge commit: `55a751dcadb7d3898abe3608c1e3a810c87d2934`
+* Final documentation/release commit: `9323d41a1d0a6d7e7ca5e24510cb32129ac1e8ad`
+* Annotated tag: `v0.10.0` (points to `9323d41`)
+* GitHub Release: https://github.com/marceaubrugman/household-inventory-tracker/releases/tag/v0.10.0
+* Exact-release-commit CI: https://github.com/marceaubrugman/household-inventory-tracker/actions/runs/39425458664
+* Tag-triggered CI: https://github.com/marceaubrugman/household-inventory-tracker/actions/runs/39425768317
+* All three jobs passed: Python non-integration, isolated PostgreSQL integration, Docker build
+* Local release smoke: fresh isolated Docker Compose PostgreSQL, health, read/write, and persistence after API container recreation; the smoke-test PostgreSQL volume remains preserved
+* Live model+PostgreSQL demo: guarded draft `24 -> 22`, actual stored quantity remained `24`
+* No new Azure deployment for v0.10.0 and no agent HTTP interface
+* Azure cost action: both v0.9.0 compute resources stopped 20 October; registry and database storage remain, and PostgreSQL may auto-restart about 27 October. Azure review reminder set for 26 October.
+
+### Close tail (in progress)
+
+* [x] Record released commit `9323d41`, annotated tag `v0.10.0`, PR #14, and passing final/tag CI
 * [ ] Create the canonical v0.10.0 to v0.11.0 handover
-* [ ] Confirm Azure and demo-environment cost/stop state
+* [x] Confirm Azure Container App `ca-hit-v090` and PostgreSQL Flexible Server `pg-hit-v090-marceau` stopped by user in Azure Portal on 20 October 2026; preserve ACR, identity, environment, and PostgreSQL storage. Note nonzero residual charges and PostgreSQL seven-day automatic restart. Local isolated smoke-test containers shut down without deleting volume; previous agent demo data preserved.
 * [ ] Clean up merged branches and stale remote refs
 * [ ] Curate the Living Learning Library last
 
@@ -1244,9 +1260,9 @@ Later, before a public or user-facing agent product:
 
 # Immediate Next Action
 
-HIT v0.10.0 has been merged into `main` through PR #14 (`55a751d`); the post-merge CI checks passed.
+HIT v0.10.0 was published on 20 October 2026 as a normal GitHub Release with annotated tag `v0.10.0` pointing to `9323d41`; CI passed on the release commit and on the tag push. The v0.9.0 Azure deployment remains preserved with Container App and PostgreSQL compute stopped (not necessarily zero-cost).
 
-Commit and push the final release-documentation reconciliation on `main`, verify CI on that documentation commit, then create the annotated `v0.10.0` tag and publish the GitHub Release. Record the final tag and release in the Close tail. No v0.10.0 Azure deployment is claimed. Update the Living Learning Library last.
+Next: commit this post-release status record, clean up the merged `feature/agentic-inventory` branch safely, create the canonical v0.10.0 → v0.11.0 handover, and curate the private Living Learning Library **last**. Check Azure on 26 October before PostgreSQL auto-restarts and free credit expires. No v0.10.0 Azure deployment is claimed.
 
 ## Proposed Apprenticeship I finishing sequence (not yet activated)
 
