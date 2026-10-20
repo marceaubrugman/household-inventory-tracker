@@ -16,6 +16,8 @@ The project is developed incrementally. Each release should:
 
 **Stable release: v0.9.0**
 
+**Current development milestone: v0.10.0 (Guarded Agentic Inventory Proposals), Pre-Lock on `feature/agentic-inventory`. Not yet merged, tagged, published, or deployed to Azure as v0.10.0.**
+
 HIT is a PostgreSQL-backed Python inventory application with two interfaces:
 
 * a menu-driven console application
@@ -51,7 +53,11 @@ The current implementation includes:
 * verified graceful degradation for PostgreSQL network loss and missing database configuration
 * GitHub Actions checks for Python tests, PostgreSQL integration tests, and Docker image builds
 * unit, API, service, migration, repository, and full-stack PostgreSQL integration tests
-* 105 passing automated tests before final v0.9.0 Lock verification
+* 105 passing automated tests at the v0.9.0 baseline
+* bounded, search-first AI inventory discovery and draft-only consumption proposals in the v0.10.0 feature branch
+* independent Python verification of proposed item IDs, consumption amounts, tracking modes, and available stock
+* verified unchanged PostgreSQL quantities after the live AI demonstration
+* 164 passing non-integration tests and 34 PostgreSQL integration tests verified in CI during v0.10.0 Tock
 
 PostgreSQL remains the application’s source of truth.
 
@@ -59,7 +65,7 @@ The JSON runtime used in v0.1.0 has been removed. JSON remains supported only as
 
 Docker Compose starts the FastAPI API service and a PostgreSQL 18 database service together for reproducible local development.
 
-The v0.9.0 Tick and Tock work are complete on `feature/azure-deployment-foundation`. Release Lock is in progress.
+v0.9.0 is released. v0.10.0 Tick and Tock are complete on `feature/agentic-inventory`; the feature scope is frozen and Pre-Lock documentation is in progress. The release has not been merged into `main`.
 
 ## Current Architecture
 
@@ -94,6 +100,26 @@ database.py
    ↓
 PostgreSQL
 ```
+
+### Agentic inventory path (v0.10.0 feature branch)
+
+```text
+User consumption statement
+   ↓
+OpenAI Responses API tool requests
+   ↓
+src/agent/proposal_orchestrator.py
+   ↓
+Approved read-only search via src/agent/dispatcher.py and tools.py
+   ↓
+item_service.py → item_repository.py → database.py → PostgreSQL
+   ↓
+Python intent, identity, and quantity verification
+   ↓
+Draft proposal only (no inventory update)
+```
+
+This is a Python-level demonstration workflow, not a new FastAPI route or user-facing interface. The current search tool returns `matches` and `has_more`, and the database remains authoritative.
 
 ### Docker local development path
 
@@ -905,7 +931,7 @@ Expose HIT's useful inventory query behavior through the FastAPI interface while
 
 ---
 
-# Current Release Milestone
+# Completed Release Milestone
 
 ## v0.9.0: Azure Deployment Foundation
 
@@ -978,6 +1004,80 @@ Deploy the existing PostgreSQL-backed HIT API to Azure without changing its core
 * [x] No major CI/CD redesign
 * [x] Existing local Docker Compose workflow preserved
 * [x] Existing application/database layering preserved
+
+---
+
+# Current Release Milestone
+
+## v0.10.0: Guarded Agentic Inventory Proposals
+
+### Goal
+
+Add one meaningful, bounded AI capability over HIT's established Python/PostgreSQL architecture. The model can search recorded inventory and request a consumption draft. Python independently verifies the original request and inventory state; the agent never modifies stock.
+
+### Tick (complete)
+
+* [x] Introduce approved read-only inventory lookup tools
+* [x] Validate model-generated tool arguments with Pydantic
+* [x] Bound model interactions and disallow parallel tool calls
+* [x] Require real inventory search before requesting a proposal
+* [x] Verify proposed item IDs against returned search `matches`
+* [x] Resolve consumption intent, item identity, and amount independently in Python
+* [x] Reject ambiguous identities, mismatched amounts, invalid items, and unavailable quantities
+* [x] Return only a guarded `draft`, with expected and proposed quantities
+* [x] Demonstrate a real AI-driven search and proposal against PostgreSQL
+* [x] Verify stored inventory remains unchanged in the live demonstration
+
+### Tock (accepted)
+
+* [x] Review orchestrator, dispatcher, workflow, and repository boundaries
+* [x] Correct mocked search-response assumptions (`items` versus actual `matches`)
+* [x] Add a regression test through the real search tool and dispatcher contract
+* [x] Translate database outages during search into a controlled inventory-unavailable error
+* [x] Translate database outages during independent draft verification into the same safe error
+* [x] Confirm 164 passing non-integration tests locally
+* [x] Confirm GitHub Actions passes non-integration, isolated PostgreSQL integration, and Docker-build jobs on `ec247b3`
+* [x] Preserve the existing PostgreSQL schema, console, API, Docker, and Azure deployment architecture
+* [x] Freeze v0.10.0 feature scope
+
+### Pre-Lock (in progress)
+
+* [ ] Align README, BACKLOG, and DATABASE_PLAN with the v0.10.0 development state
+* [ ] Verify descriptions against the actual Python API and test contracts
+* [ ] Check the complete code and documentation diff against the v0.9.0 baseline
+* [ ] Inspect tracked files for credentials and private inventory data
+* [ ] Produce the final Lock acceptance checklist
+
+### Lock (not started)
+
+* [ ] Confirm dependency installation and Python compile checks
+* [ ] Run final test and whitespace checks on the release candidate
+* [ ] Verify the Docker build and any necessary local smoke checks
+* [ ] Review public documentation and version metadata
+* [ ] Commit and push the reviewed release candidate
+* [ ] Open and review the v0.10.0 pull request
+* [ ] Confirm all three GitHub Actions jobs pass for the candidate
+* [ ] Merge the release work into `main`
+* [ ] Verify the exact merged release state
+* [ ] Create and push the annotated `v0.10.0` tag
+* [ ] Publish the GitHub Release
+
+### Close tail (not started)
+
+* [ ] Record the released commit, tag, PR, and CI evidence
+* [ ] Create the canonical v0.10.0 to v0.11.0 handover
+* [ ] Confirm Azure and demo-environment cost/stop state
+* [ ] Clean up merged branches and stale remote refs
+* [ ] Curate the Living Learning Library last
+
+### Explicit scope boundaries
+
+* No inventory write, consumption execution, or approval workflow in the agent
+* No agent HTTP endpoint or browser interface in this release
+* No authentication, household tenancy, or authorization feature
+* No stock-movement history or new PostgreSQL schema migration
+* No new Azure deployment topology or production claim for v0.10.0
+* Additional privacy, consent, and user-facing safeguards remain required before a public product workflow
 
 ---
 
@@ -1097,11 +1197,19 @@ Later:
 
 ## AI-assisted capabilities
 
-* [ ] Define a useful, bounded AI-assisted feature
-* [ ] Keep deterministic inventory operations independent from AI
-* [ ] Add privacy and consent considerations
-* [ ] Add evaluation criteria before implementation
-* [ ] Avoid adding AI solely for portfolio decoration
+Completed in v0.10.0 development:
+
+* [x] Define and demonstrate a useful, bounded AI-assisted consumption proposal
+* [x] Keep deterministic inventory operations independent from AI
+* [x] Use real inventory evidence, validated tool arguments, and independently checked drafts
+* [x] Prove that agent output does not modify stored inventory
+
+Later, before a public or user-facing agent product:
+
+* [ ] Define privacy and consent requirements for real household inventory sent to a model provider
+* [ ] Establish broader model-evaluation criteria and repeatable scenario coverage
+* [ ] Design explicit approval and safe execution separately from draft creation
+* [ ] Avoid expanding AI solely for portfolio decoration
 
 ---
 
@@ -1136,6 +1244,14 @@ Later:
 
 # Immediate Next Action
 
-HIT v0.9.0 is fully released.
+HIT v0.9.0 remains the stable release. v0.10.0 is in Pre-Lock on `feature/agentic-inventory`, with Tick and Tock accepted.
 
-Complete the post-release close tail: record the release state, create the canonical v0.9.0 to v0.10.0 handover, update the Living Learning Library last, decide the Azure cost state, and clean up the merged feature branch.
+Review and incorporate the coordinated documentation changes, then inspect the complete release diff and prepare the final Lock checklist. Do not merge, tag, or claim a v0.10.0 Azure deployment until the release gates have been completed. The Learning Library update remains the final Close-tail learning step.
+
+## Proposed Apprenticeship I finishing sequence (not yet activated)
+
+* **v0.11.0 candidate:** minimal usable browser frontend, keeping writes behind an appropriate access boundary
+* **v0.12.0 candidate:** measured stock-consumption/movement history suitable for a future external-data integration
+* **Final integration/graduation candidate:** end-to-end demonstration and portfolio proof, potentially v0.13.0 or v1.0
+
+Authentication, multi-household tenancy, and extensive production hardening are not automatically prerequisites for completing the technical apprenticeship; any real public write exposure requires its own security gate.
